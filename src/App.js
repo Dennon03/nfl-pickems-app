@@ -1,24 +1,60 @@
-import logo from './logo.svg';
-import './App.css';
+import React, { useState, useEffect } from "react";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import Login from "./components/Login";
+import LandingPage from "./pages/LandingPage";
+import PicksPage from "./pages/PicksPage";
+import ViewPicksPage from "./pages/ViewPicksPage";
+import ResultsPage from "./pages/ResultsPage";
+import LeaderboardPage from "./pages/LeaderboardPage";
 
 function App() {
+  const [user, setUser] = useState(null);
+  const [checkingUser, setCheckingUser] = useState(false); // No loading needed for user check on startup
+
+  useEffect(() => {
+    // Remove auto-login on app start by clearing localStorage
+    localStorage.removeItem("user");
+    setUser(null);
+    setCheckingUser(false);
+  }, []);
+
+  if (checkingUser) {
+    return <p>Loading...</p>;
+  }
+
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
+    <Router>
+      <Routes>
+        {/* Public route */}
+        <Route
+          path="/login"
+          element={!user ? <Login onLogin={setUser} /> : <Navigate to="/" replace />}
+        />
+        {/* Protected routes */}
+        <Route
+          path="/"
+          element={user ? <LandingPage user={user} /> : <Navigate to="/login" replace />}
+        />
+        <Route
+          path="/picks"
+          element={user ? <PicksPage user={user} /> : <Navigate to="/login" replace />}
+        />
+        <Route
+          path="/view-picks"
+          element={user ? <ViewPicksPage user={user} /> : <Navigate to="/login" replace />}
+        />
+        <Route
+          path="/results"
+          element={user ? <ResultsPage user={user} /> : <Navigate to="/login" replace />}
+        />
+        <Route
+          path="/leaderboard"
+          element={user ? <LeaderboardPage /> : <Navigate to="/login" replace />}
+        />
+        {/* Catch all redirect */}
+        <Route path="*" element={<Navigate to={user ? "/" : "/login"} replace />} />
+      </Routes>
+    </Router>
   );
 }
 
