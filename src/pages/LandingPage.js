@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
 import { useNavigate } from "react-router-dom";
-import { API_BASE } from "../api";
+import { supabase } from "../supabaseClient";
 
 export default function LandingPage({ user }) {
   const [gamesByWeek, setGamesByWeek] = useState({});
@@ -12,80 +11,80 @@ export default function LandingPage({ user }) {
   const [checkingPicks, setCheckingPicks] = useState(false);
   const navigate = useNavigate();
 
-  // Fetch current week from server
-  const fetchCurrentWeekFromServer = async () => {
-    try {
-      const r = await axios.get(`${API_BASE}/current-week`);
-      if (r.data?.currentWeek != null) return Number(r.data.currentWeek);
-    } catch (err) {
-      console.error("Error fetching current week:", err);
-    }
-    return null;
-  };
-
-  // Fetch games and determine current week
+  // Fetch games from Supabase
   useEffect(() => {
-    const fetchGamesAndCurrentWeek = async () => {
+    const fetchGames = async () => {
       try {
-        const res = await axios.get(`${API_BASE}/games`);
-        const grouped = res.data.reduce((acc, game) => {
+        const { data: games, error } = await supabase
+          .from("games")
+          .select("*")
+          .order("game_date", { ascending: true });
+
+        if (error) throw error;
+
+        // Group games by week
+        const grouped = games.reduce((acc, game) => {
           const week = Number(game.week_id);
           if (!acc[week]) acc[week] = [];
           acc[week].push(game);
           return acc;
         }, {});
 
+        // Sort each week's games by date
         Object.keys(grouped).forEach((wk) => {
-          grouped[wk].sort((a, b) => new Date(a.game_date) - new Date(b.game_date));
+          grouped[wk].sort(
+            (a, b) => new Date(a.game_date) - new Date(b.game_date)
+          );
         });
 
         setGamesByWeek(grouped);
 
-        // Determine active week
-        let activeWeek = await fetchCurrentWeekFromServer();
-        if (!activeWeek) {
-          const now = new Date();
-          const weeksSorted = Object.keys(grouped).map(Number).sort((a, b) => a - b);
+        // Determine current week
+        const now = new Date();
+        const weeksSorted = Object.keys(grouped).map(Number).sort((a, b) => a - b);
 
-          // default to first week
-          activeWeek = weeksSorted[0];
-
-          // check for the latest week where start_date <= now
-          for (let wk of weeksSorted) {
-            const weekStart = new Date(grouped[wk][0].game_date); // first game date = start_date
-            if (now >= weekStart) activeWeek = wk;
-            else break;
-          }
+        let activeWeek = weeksSorted[0];
+        for (let wk of weeksSorted) {
+          const weekStart = new Date(grouped[wk][0].game_date);
+          if (now >= weekStart) activeWeek = wk;
+          else break;
         }
-
         setCurrentWeek(activeWeek);
       } catch (err) {
         console.error(err);
-        setError("Failed to load games");
+        setError("Failed to load games from database.");
       } finally {
         setLoading(false);
       }
     };
 
-    fetchGamesAndCurrentWeek();
+    fetchGames();
   }, []);
 
-  // Check if user has saved picks for current week
+  // Check if user has saved picks
   useEffect(() => {
-    const checkStatus = async () => {
+    const checkPicks = async () => {
       if (!user || !currentWeek) return;
+
       setCheckingPicks(true);
       try {
-        const res = await axios.get(`${API_BASE}/picks-status?userId=${user.id}&week=${currentWeek}&_=${Date.now()}`);
-        setHasSavedPicks(!!res.data?.hasPicks);
+        const { data: picks, error } = await supabase
+          .from("picks")
+          .select("*", { count: "exact" })
+          .eq("user_id", user.id)
+          .eq("week_id", currentWeek);
+
+        if (error) throw error;
+        setHasSavedPicks(picks.length > 0);
       } catch (err) {
-        console.error("Error checking picks-status:", err);
+        console.error(err);
         setHasSavedPicks(false);
       } finally {
         setCheckingPicks(false);
       }
     };
-    checkStatus();
+
+    checkPicks();
   }, [user, currentWeek]);
 
   if (loading) return <p>Loading games...</p>;
@@ -161,7 +160,6 @@ export default function LandingPage({ user }) {
         </div>
       )}
 
-      {/* Full schedule display */}
       {availableWeeks.map((week) => (
         <div key={week} style={{ marginBottom: 40 }}>
           <h2 style={{ borderBottom: "2px solid #0078d7", paddingBottom: 6, color: "#0078d7" }}>
@@ -203,20 +201,11 @@ export default function LandingPage({ user }) {
             </table>
           </div>
 
-          {(() => {
-            let byeTeams = [];
-            try {
-              const raw = gamesByWeek[week][0]?.bye_teams;
-              byeTeams = raw ? JSON.parse(raw) : [];
-            } catch (e) {
-              console.warn("Failed to parse bye_teams:", gamesByWeek[week][0]?.bye_teams);
-            }
-            return byeTeams.length > 0 ? (
-              <p style={{ marginTop: 10, fontStyle: "italic", color: "#555", textAlign: "center" }}>
-                Byes: {byeTeams.join(", ")}
-              </p>
-            ) : null;
-          })()}
+          {gamesByWeek[week][0]?.bye_teams?.length > 0 && (
+            <p style={{ marginTop: 10, fontStyle: "italic", color: "#555", textAlign: "center" }}>
+              Byes: {gamesByWeek[week][0].bye_teams.join(", ")}
+            </p>
+          )}
         </div>
       ))}
     </div>
