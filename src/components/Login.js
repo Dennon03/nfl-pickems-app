@@ -18,27 +18,29 @@ export default function Login({ onLogin }) {
     setError(null);
 
     try {
-      // Try to fetch the user from Supabase
+      // Try to fetch existing user
       const { data, error: selectError } = await supabase
         .from("users")
         .select("*")
         .eq("username", trimmedUsername)
-        .maybeSingle(); // <-- replaces .single() so "no rows" isn't treated as error
+        .maybeSingle(); // ✅ does not throw if no rows
 
-      let user;
+      if (selectError) {
+        setError(selectError.message);
+        return;
+      }
 
-      if (!data) {
+      let user = data;
+
+      if (!user) {
         // Ask before creating
         const create = window.confirm(
           `Username "${trimmedUsername}" not found. Would you like to create a new account?`
         );
 
-        if (!create) {
-          setLoading(false);
-          return;
-        }
+        if (!create) return;
 
-        // Create new user in Supabase
+        // Create new user
         const { data: newUser, error: insertError } = await supabase
           .from("users")
           .insert([{ username: trimmedUsername }])
@@ -47,17 +49,13 @@ export default function Login({ onLogin }) {
 
         if (insertError) {
           setError(insertError.message);
-          setLoading(false);
           return;
         }
 
         user = newUser;
-      } else {
-        // User exists
-        user = data;
       }
 
-      // Pass user info to parent (LandingPage)
+      // ✅ Pass user info to parent
       onLogin(user);
     } catch (err) {
       console.error(err);
