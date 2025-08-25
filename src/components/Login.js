@@ -19,20 +19,29 @@ export default function Login({ onLogin }) {
 
     try {
       // Check if username exists in Supabase 'users' table
-      const { data, error } = await supabase
+      const { data, error: selectError } = await supabase
         .from("users")
         .select("*")
         .eq("username", trimmedUsername)
         .single();
 
-      if (error && error.code !== "PGRST116") { // ignore "no rows" error
-        setError(error.message);
+      if (selectError && selectError.code !== "PGRST116") { // ignore "no rows" error
+        setError(selectError.message);
+        setLoading(false);
         return;
       }
 
       let user;
       if (!data) {
-        // Username doesn't exist, create new user
+        // Username doesn't exist, ask if user wants to create it
+        const create = window.confirm(
+          `Username "${trimmedUsername}" not found. Create a new account?`
+        );
+        if (!create) {
+          setLoading(false);
+          return;
+        }
+
         const { data: newUser, error: insertError } = await supabase
           .from("users")
           .insert([{ username: trimmedUsername }])
@@ -41,6 +50,7 @@ export default function Login({ onLogin }) {
 
         if (insertError) {
           setError(insertError.message);
+          setLoading(false);
           return;
         }
         user = newUser;
@@ -48,7 +58,7 @@ export default function Login({ onLogin }) {
         user = data;
       }
 
-      // Pass the user info back to your app
+      // Pass user info to parent component (landing page)
       onLogin(user);
     } catch (err) {
       console.error(err);
@@ -60,7 +70,6 @@ export default function Login({ onLogin }) {
 
   return (
     <div style={{ position: "relative", width: "100vw", height: "100vh" }}>
-      {/* Background image */}
       <img
         src={nflBackground}
         alt="Background"
@@ -72,7 +81,6 @@ export default function Login({ onLogin }) {
         }}
       />
 
-      {/* Login form */}
       <div
         style={{
           position: "absolute",
