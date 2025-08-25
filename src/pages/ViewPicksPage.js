@@ -1,36 +1,79 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
 import { useLocation, useNavigate } from "react-router-dom";
-import { API_BASE } from "../api";
+import { supabase } from "../supabaseClient";
 
 export default function ViewPicksPage({ user }) {
   const [savedPicks, setSavedPicks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [editing, setEditing] = useState(false); 
-  
+  const [editing, setEditing] = useState(false);
+  const [firstGameStart, setFirstGameStart] = useState(null);
+  const picksLocked = firstGameStart && new Date() >= new Date(firstGameStart);
 
   const navigate = useNavigate();
   const query = new URLSearchParams(useLocation().search);
   const week = query.get("week") || 1;
 
-  useEffect(() => {
-    const fetchSavedPicks = async () => {
-      try {
-        const res = await axios.get(`${API_BASE}/user-saved-picks`, {
-          params: { userId: user.id, week },
-        });
-        setSavedPicks(res.data);
-      } catch (err) {
-        setError("Failed to load saved picks");
-        console.error(err);
-      } finally {
+  // Fetch user picks and merge with game info
+  const fetchSavedPicks = async () => {
+    setLoading(true);
+    try {
+      // 1. Get user picks for this week
+      const { data: picksData, error: picksError } = await supabase
+        .from("user_picks")
+        .select("game_id, picked_team")
+        .eq("user_id", user.id)
+        .eq("week", week);
+
+      if (picksError) throw picksError;
+      if (!picksData || picksData.length === 0) {
+        setSavedPicks([]);
         setLoading(false);
+        return;
       }
-    };
-    fetchSavedPicks();
-  }, [user.id, week]);
+
+      // 2. Get the corresponding game info from games table
+      const gameIds = picksData.map((p) => p.game_id);
+      const { data: gamesData, error: gamesError } = await supabase
+        .from("games")
+        .select("game_code, game_date, home_team, away_team")
+        .in("game_code", gameIds);
+
+      if (gamesError) throw gamesError;
+
+      // 3. Merge picks with game info
+      let picks = picksData.map((pick) => {
+        const game = gamesData.find((g) => g.game_code === pick.game_id);
+        return {
+          game_id: pick.game_id,
+          picked_team: pick.picked_team,
+          game_date: game?.game_date,
+          home_team: game?.home_team,
+          away_team: game?.away_team,
+        };
+      });
+
+      // 4. Sort by game_date ascending
+      picks.sort((a, b) => new Date(a.game_date) - new Date(b.game_date));
+
+      setSavedPicks(picks);
+
+      if (picks.length > 0) {
+        const earliestGame = picks[0].game_date ? new Date(picks[0].game_date) : null;
+        setFirstGameStart(earliestGame);
+      }
+    } catch (err) {
+      console.error("Failed to fetch picks", err);
+      setError("Failed to load saved picks");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (user?.id) fetchSavedPicks();
+  }, [user?.id, week]);
 
   const handlePickChange = (gameId, newPick) => {
     setSavedPicks((prev) =>
@@ -43,19 +86,21 @@ export default function ViewPicksPage({ user }) {
   const saveChanges = async () => {
     setSaving(true);
     try {
-      const picksPayload = {};
-      savedPicks.forEach((pick) => {
-        picksPayload[pick.game_id] = pick.picked_team;
-      });
+      const formattedPicks = savedPicks.map((pick) => ({
+        user_id: user.id,
+        week: week,
+        game_id: pick.game_id,
+        picked_team: pick.picked_team,
+      }));
 
-      await axios.post(`${API_BASE}/save-picks`, {
-        userId: user.id,
-        week: Number(week),
-        picks: picksPayload,
-      });
+      const { error } = await supabase
+        .from("user_picks")
+        .upsert(formattedPicks, { onConflict: ["user_id", "week", "game_id"] });
+
+      if (error) throw error;
 
       alert("Picks updated successfully!");
-      setEditing(false); // exit edit mode
+      setEditing(false);
     } catch (err) {
       console.error("Error saving picks:", err);
       alert("Failed to save picks.");
@@ -87,7 +132,7 @@ export default function ViewPicksPage({ user }) {
 
       <h1>Your Picks - Week {week}</h1>
 
-      {!editing && (
+      {!editing && !picksLocked && (
         <button
           onClick={() => setEditing(true)}
           style={{
@@ -103,6 +148,12 @@ export default function ViewPicksPage({ user }) {
         >
           Edit Picks
         </button>
+      )}
+
+      {picksLocked && (
+        <p style={{ color: "red", fontWeight: "bold" }}>
+          Picks are locked for this week. First game has started.
+        </p>
       )}
 
       <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -136,6 +187,7 @@ export default function ViewPicksPage({ user }) {
                     onChange={(e) =>
                       handlePickChange(pick.game_id, e.target.value)
                     }
+                    disabled={picksLocked || saving}
                   >
                     <option value={pick.home_team}>{pick.home_team}</option>
                     <option value={pick.away_team}>{pick.away_team}</option>
@@ -149,7 +201,7 @@ export default function ViewPicksPage({ user }) {
         </tbody>
       </table>
 
-      {editing && (
+      {editing && !picksLocked && (
         <div style={{ marginTop: 20, textAlign: "center" }}>
           <button
             onClick={saveChanges}

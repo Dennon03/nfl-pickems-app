@@ -24,7 +24,6 @@ export default function PicksPage({ user }) {
         if (error) throw error;
         if (!weeksData || weeksData.length === 0) throw new Error("No weeks found");
 
-        // Find current week based on today's date
         const currentWeekObj =
           weeksData.find((w) => today >= w.start_date && today <= w.end_date) ||
           weeksData[0]; // fallback to first week
@@ -92,7 +91,6 @@ export default function PicksPage({ user }) {
     fetchPicks();
   }, [week, user]);
 
-  // Determine if picks are locked
   const now = new Date();
   const firstGameStart = games.length
     ? new Date(Math.min(...games.map((g) => new Date(g.game_date))))
@@ -109,29 +107,44 @@ export default function PicksPage({ user }) {
       alert("User not logged in!");
       return;
     }
-    if (Object.keys(picks).length !== games.length) {
-      alert("It looks like you forgot to pick a game!");
+
+    // Ensure all games are picked
+    if (Object.keys(picks).length !== games.length || Object.values(picks).some(v => !v)) {
+      alert("Please make a pick for every game before submitting.");
       return;
     }
 
     setSaving(true);
     try {
       const formattedPicks = games.map((game) => ({
-        user_id: user.id, // UUID string from Supabase Auth
+        user_id: user.id,
         week: week,
         game_id: game.game_code,
         picked_team: picks[game.game_code],
       }));
 
-      const { data, error } = await supabase
+      // Save picks
+      const { error: upsertError } = await supabase
         .from("user_picks")
         .upsert(formattedPicks, { onConflict: ["user_id", "week", "game_id"] });
 
-      if (error) throw error;
-      console.log("Picks saved:", data);
+      if (upsertError) throw upsertError;
+
+      // Update user_week_picks_status
+      const { error: statusError } = await supabase
+        .from("user_week_picks_status")
+        .upsert({
+          user_id: user.id,
+          week: week,
+          has_picks: true,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: ["user_id", "week"] });
+
+      if (statusError) throw statusError;
+
       navigate(`/view-picks?week=${week}`);
     } catch (err) {
-      console.error("Failed to save picks", err);
+      console.error("Failed to save picks or update status", err);
       alert("Failed to save picks. Please try again.");
     } finally {
       setSaving(false);

@@ -50,6 +50,7 @@ export default function LandingPage({ user }) {
           else break;
         }
         setCurrentWeek(activeWeek);
+
       } catch (err) {
         console.error(err);
         setError("Failed to load games from database.");
@@ -63,19 +64,21 @@ export default function LandingPage({ user }) {
 
   // Check if user has saved picks
   useEffect(() => {
-    const checkPicks = async () => {
+    const checkPicksStatus = async () => {
       if (!user || !currentWeek) return;
 
       setCheckingPicks(true);
       try {
-        const { data: picks, error } = await supabase
-          .from("user_picks")
-          .select("*", { count: "exact" })
+        const { data: status, error } = await supabase
+          .from("user_week_picks_status")
+          .select("has_picks")
           .eq("user_id", user.id)
-          .eq("week_id", currentWeek);
+          .eq("week", currentWeek)
+          .single(); // there is only one row per user & week
 
         if (error) throw error;
-        setHasSavedPicks(picks.length > 0);
+
+        setHasSavedPicks(status?.has_picks || false);
       } catch (err) {
         console.error(err);
         setHasSavedPicks(false);
@@ -84,7 +87,7 @@ export default function LandingPage({ user }) {
       }
     };
 
-    checkPicks();
+    checkPicksStatus();
   }, [user, currentWeek]);
 
   if (loading) return <p>Loading games...</p>;
@@ -116,7 +119,7 @@ export default function LandingPage({ user }) {
                 borderRadius: 6,
                 fontWeight: "600",
                 cursor: checkingPicks ? "not-allowed" : "pointer",
-                opacity: checkingPicks ? 0.8 : 1,
+                opacity: checkingPicks ? 0.6 : 1,
               }}
             >
               {hasSavedPicks
@@ -154,7 +157,7 @@ export default function LandingPage({ user }) {
               View Leaderboard (Week {currentWeek})
             </button>
           </div>
-          {!hasSavedPicks && checkingPicks && (
+          {checkingPicks && (
             <div style={{ marginTop: 8, color: "#666" }}>Checking your picks…</div>
           )}
         </div>
