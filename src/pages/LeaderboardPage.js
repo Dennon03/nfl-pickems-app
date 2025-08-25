@@ -1,75 +1,108 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
-import { API_BASE } from "../api";
+import { supabase } from "../supabaseClient";
 
 export default function LeaderboardPage() {
-  const [week, setWeek] = useState(null); // dynamic week
+  const [week, setWeek] = useState(null);
   const [leaderboard, setLeaderboard] = useState([]);
   const [grandTotals, setGrandTotals] = useState({});
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
+  // Determine the week to display
   useEffect(() => {
-    async function fetchCurrentWeek() {
+    const fetchCurrentWeek = async () => {
       try {
-        const res = await axios.get(`${API_BASE}/current-week`);
-        setWeek(res.data.currentWeek); // null if no weeks in table
+        // Try to get the latest week that has any user picks
+        const { data: picksData, error: picksError } = await supabase
+          .from("user_picks")
+          .select("week")
+          .order("week", { ascending: false })
+          .limit(1)
+          .single();
+
+        if (picksError) throw picksError;
+
+        // If no picks exist, default to week 1
+        setWeek(picksData?.week || 1);
       } catch (err) {
         console.error("Error fetching current week:", err);
-        setWeek(null);
+        setWeek(1);
       }
-    }
+    };
 
     fetchCurrentWeek();
   }, []);
 
-  // Fetch leaderboard data for the determined week
   useEffect(() => {
     if (!week) return;
 
-    async function fetchLeaderboard() {
+    const fetchLeaderboard = async () => {
       setLoading(true);
       try {
-        const resWeek = await axios.get(`${API_BASE}/user-saved-picks-week`, {
-          params: { week },
-        });
+        // Fetch all picks for the week with user info
+        const { data: picksData, error: picksError } = await supabase
+          .from("user_picks")
+          .select(`
+            user_id,
+            picked_team,
+            week,
+            users(username),
+            games(home_team, away_team, home_score, away_score)
+          `)
+          .eq("week", week);
 
+        if (picksError) throw picksError;
+        if (!picksData || picksData.length === 0) {
+          setLeaderboard([]);
+          setLoading(false);
+          return;
+        }
+
+        // Calculate weekly stats
         const userStats = {};
-        resWeek.data.forEach((pick) => {
-          if (!userStats[pick.user_id]) {
-            userStats[pick.user_id] = {
-              user_id: pick.user_id,
-              username: pick.username,
-              correctCount: 0,
-              totalPicks: 0,
-            };
+        const grandTotalsMap = {};
+
+        picksData.forEach((pick) => {
+          const userId = pick.user_id;
+          const username = pick.users?.username || "Unknown";
+
+          const game = pick.games;
+          let winner_team = null;
+          if (game?.home_score != null && game?.away_score != null) {
+            winner_team =
+              game.home_score > game.away_score
+                ? game.home_team
+                : game.away_score > game.home_score
+                ? game.away_team
+                : "Tie";
           }
-          userStats[pick.user_id].totalPicks += 1;
-          if (pick.picked_team === pick.winner_team) userStats[pick.user_id].correctCount += 1;
+
+          if (!userStats[userId]) {
+            userStats[userId] = { user_id: userId, username, correctCount: 0, totalPicks: 0 };
+          }
+          userStats[userId].totalPicks += 1;
+          if (pick.picked_team === winner_team) userStats[userId].correctCount += 1;
+
+          if (!grandTotalsMap[userId]) grandTotalsMap[userId] = 0;
+          if (pick.picked_team === winner_team) grandTotalsMap[userId] += 1;
         });
 
         setLeaderboard(Object.values(userStats).sort((a, b) => b.correctCount - a.correctCount));
-
-        const resGrand = await axios.get(`${API_BASE}/user-grand-total`, { params: { week } });
-        const totalsMap = {};
-        resGrand.data.forEach((u) => {
-          totalsMap[u.user_id] = u.grand_total_correct;
-        });
-        setGrandTotals(totalsMap);
+        setGrandTotals(grandTotalsMap);
       } catch (err) {
         console.error("Error fetching leaderboard:", err);
       } finally {
         setLoading(false);
       }
-    }
+    };
 
     fetchLeaderboard();
   }, [week]);
 
   if (loading) return <p>Loading leaderboard...</p>;
   if (!week) return <p>No completed weeks yet.</p>;
-  if (leaderboard.length === 0) return <p>No Results found for Week {week}.</p>;
+  if (leaderboard.length === 0) return <p>No results found for Week {week}.</p>;
 
   return (
     <div style={{ maxWidth: 700, margin: "auto", padding: 20 }}>
@@ -111,9 +144,7 @@ export default function LeaderboardPage() {
             >
               <td style={{ padding: "8px" }}>{index + 1}</td>
               <td style={{ padding: "8px" }}>{user.username}</td>
-              <td style={{ padding: "8px", color: "#28a745", fontWeight: 600 }}>
-                {user.correctCount}
-              </td>
+              <td style={{ padding: "8px", color: "#28a745", fontWeight: 600 }}>{user.correctCount}</td>
               <td style={{ padding: "8px" }}>{user.totalPicks}</td>
               <td style={{ padding: "8px", fontWeight: 600 }}>{grandTotals[user.user_id] ?? 0}</td>
             </tr>
