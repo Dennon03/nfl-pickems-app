@@ -10,7 +10,6 @@ export default function ResultsPage({ user }) {
   useEffect(() => {
     const fetchResults = async () => {
       try {
-        // 1. Get all user picks for this user
         const { data: picksData, error: picksError } = await supabase
           .from("user_picks")
           .select("game_id, picked_team, week")
@@ -22,16 +21,13 @@ export default function ResultsPage({ user }) {
           return;
         }
 
-        // 2. Get all game info for the picks
         const gameIds = picksData.map((p) => p.game_id);
         const { data: gamesData, error: gamesError } = await supabase
           .from("games")
           .select("game_code, game_date, home_team, away_team, home_score, away_score")
           .in("game_code", gameIds);
-
         if (gamesError) throw gamesError;
 
-        // 3. Merge picks with game info
         const combined = picksData.map((pick) => {
           const game = gamesData.find((g) => g.game_code === pick.game_id);
           let winner_team = null;
@@ -55,9 +51,7 @@ export default function ResultsPage({ user }) {
           };
         });
 
-        // Sort results by week then game_date
         combined.sort((a, b) => a.week - b.week || new Date(a.game_date) - new Date(b.game_date));
-
         setResults(combined);
       } catch (err) {
         console.error("Error fetching results:", err);
@@ -72,21 +66,12 @@ export default function ResultsPage({ user }) {
   if (loading) return <p>Loading results...</p>;
   if (results.length === 0) return <p>No results found.</p>;
 
-  // Group results by week
   const weeks = [...new Set(results.map((r) => r.week))].sort((a, b) => b - a);
-
   const grandTotalCorrect = results.filter((g) => g.picked_team === g.winner_team).length;
 
   return (
     <div style={{ maxWidth: 900, margin: "auto", padding: 20 }}>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 20,
-        }}
-      >
+      <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
         <button
           style={{
             padding: "8px 16px",
@@ -95,13 +80,13 @@ export default function ResultsPage({ user }) {
             border: "none",
             borderRadius: 4,
             cursor: "pointer",
+            marginBottom: 10,
           }}
           onClick={() => navigate("/")}
         >
           ⬅ Back to Home Page
         </button>
-
-        <h2 style={{ margin: 0 }}>
+        <h2 style={{ margin: 0, fontSize: "1rem", flex: "1 0 100%" }}>
           Grand Total: {grandTotalCorrect} / {results.length} correct overall!
         </h2>
       </div>
@@ -112,54 +97,56 @@ export default function ResultsPage({ user }) {
 
         return (
           <div key={week} style={{ marginBottom: 40 }}>
-            <h1>Week {week} Results</h1>
-            <h2 style={{ marginBottom: 20 }}>
+            <h1 style={{ fontSize: "1.2rem" }}>Week {week} Results</h1>
+            <h2 style={{ marginBottom: 20, fontSize: "1rem" }}>
               You got {correctCount} / {weekResults.length} correct for Week {week}!
             </h2>
 
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr style={{ backgroundColor: "#f0f0f0", textAlign: "left" }}>
-                  <th style={{ padding: "8px" }}>Date / Time (ET)</th>
-                  <th style={{ padding: "8px" }}>Home Team</th>
-                  <th style={{ padding: "8px" }}>Away Team</th>
-                  <th style={{ padding: "8px" }}>Your Pick</th>
-                  <th style={{ padding: "8px" }}>Winner</th>
-                  <th style={{ padding: "8px" }}>Score</th>
-                </tr>
-              </thead>
-              <tbody>
-                {weekResults.map((game) => (
-                  <tr
-                    key={game.game_id}
-                    style={{
-                      borderBottom: "1px solid #ddd",
-                      backgroundColor:
-                        game.picked_team === game.winner_team ? "#d4edda" : "#f8d7da",
-                    }}
-                  >
-                    <td style={{ padding: "8px" }}>
-                      {game.game_date &&
-                        new Date(game.game_date).toLocaleString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                          hour: "numeric",
-                          minute: "numeric",
-                          hour12: true,
-                          timeZone: "America/New_York",
-                        })}
-                    </td>
-                    <td style={{ padding: "8px", fontWeight: "600" }}>{game.home_team}</td>
-                    <td style={{ padding: "8px" }}>{game.away_team}</td>
-                    <td style={{ padding: "8px" }}>{game.picked_team}</td>
-                    <td style={{ padding: "8px" }}>{game.winner_team}</td>
-                    <td style={{ padding: "8px" }}>
-                      {game.home_score ?? "-"} - {game.away_score ?? "-"}
-                    </td>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", minWidth: 600, borderCollapse: "collapse", fontSize: "0.9rem" }}>
+                <thead>
+                  <tr style={{ backgroundColor: "#f0f0f0", textAlign: "left" }}>
+                    <th style={{ padding: "8px" }}>Date / Time (ET)</th>
+                    <th style={{ padding: "8px" }}>Home Team</th>
+                    <th style={{ padding: "8px" }}>Away Team</th>
+                    <th style={{ padding: "8px" }}>Your Pick</th>
+                    <th style={{ padding: "8px" }}>Winner</th>
+                    <th style={{ padding: "8px" }}>Score</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {weekResults.map((game) => (
+                    <tr
+                      key={game.game_id}
+                      style={{
+                        borderBottom: "1px solid #ddd",
+                        backgroundColor:
+                          game.picked_team === game.winner_team ? "#d4edda" : "#f8d7da",
+                      }}
+                    >
+                      <td style={{ padding: "8px" }}>
+                        {game.game_date &&
+                          new Date(game.game_date).toLocaleString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                            hour: "numeric",
+                            minute: "numeric",
+                            hour12: true,
+                            timeZone: "America/New_York",
+                          })}
+                      </td>
+                      <td style={{ padding: "8px", fontWeight: "600" }}>{game.home_team}</td>
+                      <td style={{ padding: "8px" }}>{game.away_team}</td>
+                      <td style={{ padding: "8px" }}>{game.picked_team}</td>
+                      <td style={{ padding: "8px" }}>{game.winner_team}</td>
+                      <td style={{ padding: "8px" }}>
+                        {game.home_score ?? "-"} - {game.away_score ?? "-"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         );
       })}

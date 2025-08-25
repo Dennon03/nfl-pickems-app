@@ -13,24 +13,19 @@ export default function LeaderboardPage() {
   useEffect(() => {
     const fetchCurrentWeek = async () => {
       try {
-        // Try to get the latest week that has any user picks
         const { data: picksData, error: picksError } = await supabase
           .from("user_picks")
           .select("week")
           .order("week", { ascending: false })
           .limit(1)
           .single();
-
         if (picksError) throw picksError;
-
-        // If no picks exist, default to week 1
         setWeek(picksData?.week || 1);
       } catch (err) {
         console.error("Error fetching current week:", err);
         setWeek(1);
       }
     };
-
     fetchCurrentWeek();
   }, []);
 
@@ -40,7 +35,6 @@ export default function LeaderboardPage() {
     const fetchLeaderboard = async () => {
       setLoading(true);
       try {
-        // Fetch all picks for the week with user info
         const { data: picksData, error: picksError } = await supabase
           .from("user_picks")
           .select(`
@@ -59,7 +53,6 @@ export default function LeaderboardPage() {
           return;
         }
 
-        // Calculate weekly stats
         const userStats = {};
         const grandTotalsMap = {};
 
@@ -106,7 +99,7 @@ export default function LeaderboardPage() {
 
   return (
     <div style={{ maxWidth: 700, margin: "auto", padding: 20 }}>
-      <div style={{ display: "flex", justifyContent: "flex-start", marginBottom: 20 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "flex-start", marginBottom: 20 }}>
         <button
           style={{
             padding: "8px 16px",
@@ -115,6 +108,7 @@ export default function LeaderboardPage() {
             border: "none",
             borderRadius: 4,
             cursor: "pointer",
+            marginBottom: 10,
           }}
           onClick={() => navigate("/")}
         >
@@ -122,35 +116,38 @@ export default function LeaderboardPage() {
         </button>
       </div>
 
-      <h1>Leaderboard - Week {week}</h1>
-      <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 20 }}>
-        <thead>
-          <tr style={{ backgroundColor: "#f0f0f0", textAlign: "left" }}>
-            <th style={{ padding: "8px" }}>Rank</th>
-            <th style={{ padding: "8px" }}>User</th>
-            <th style={{ padding: "8px" }}>Correct Picks</th>
-            <th style={{ padding: "8px" }}>Total Picks</th>
-            <th style={{ padding: "8px" }}>Grand Total Correct</th>
-          </tr>
-        </thead>
-        <tbody>
-          {leaderboard.map((user, index) => (
-            <tr
-              key={user.user_id}
-              style={{
-                borderBottom: "1px solid #ddd",
-                backgroundColor: index % 2 === 0 ? "#fafafa" : "#fff",
-              }}
-            >
-              <td style={{ padding: "8px" }}>{index + 1}</td>
-              <td style={{ padding: "8px" }}>{user.username}</td>
-              <td style={{ padding: "8px", color: "#28a745", fontWeight: 600 }}>{user.correctCount}</td>
-              <td style={{ padding: "8px" }}>{user.totalPicks}</td>
-              <td style={{ padding: "8px", fontWeight: 600 }}>{grandTotals[user.user_id] ?? 0}</td>
+      <h1 style={{ fontSize: "1.2rem" }}>Leaderboard - Week {week}</h1>
+
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ width: "100%", minWidth: 500, borderCollapse: "collapse", fontSize: "0.9rem", marginTop: 20 }}>
+          <thead>
+            <tr style={{ backgroundColor: "#f0f0f0", textAlign: "left" }}>
+              <th style={{ padding: "8px" }}>Rank</th>
+              <th style={{ padding: "8px" }}>User</th>
+              <th style={{ padding: "8px" }}>Correct Picks</th>
+              <th style={{ padding: "8px" }}>Total Picks</th>
+              <th style={{ padding: "8px" }}>Grand Total Correct</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {leaderboard.map((user, index) => (
+              <tr
+                key={user.user_id}
+                style={{
+                  borderBottom: "1px solid #ddd",
+                  backgroundColor: index % 2 === 0 ? "#fafafa" : "#fff",
+                }}
+              >
+                <td style={{ padding: "8px" }}>{index + 1}</td>
+                <td style={{ padding: "8px" }}>{user.username}</td>
+                <td style={{ padding: "8px", color: "#28a745", fontWeight: 600 }}>{user.correctCount}</td>
+                <td style={{ padding: "8px" }}>{user.totalPicks}</td>
+                <td style={{ padding: "8px", fontWeight: 600 }}>{grandTotals[user.user_id] ?? 0}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

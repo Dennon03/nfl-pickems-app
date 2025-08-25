@@ -15,17 +15,14 @@ export default function ViewPicksPage({ user }) {
   const query = new URLSearchParams(useLocation().search);
   const week = query.get("week") || 1;
 
-  // Fetch user picks and merge with game info
   const fetchSavedPicks = async () => {
     setLoading(true);
     try {
-      // 1. Get user picks for this week
       const { data: picksData, error: picksError } = await supabase
         .from("user_picks")
         .select("game_id, picked_team")
         .eq("user_id", user.id)
         .eq("week", week);
-
       if (picksError) throw picksError;
       if (!picksData || picksData.length === 0) {
         setSavedPicks([]);
@@ -33,16 +30,13 @@ export default function ViewPicksPage({ user }) {
         return;
       }
 
-      // 2. Get the corresponding game info from games table
       const gameIds = picksData.map((p) => p.game_id);
       const { data: gamesData, error: gamesError } = await supabase
         .from("games")
         .select("game_code, game_date, home_team, away_team")
         .in("game_code", gameIds);
-
       if (gamesError) throw gamesError;
 
-      // 3. Merge picks with game info
       let picks = picksData.map((pick) => {
         const game = gamesData.find((g) => g.game_code === pick.game_id);
         return {
@@ -54,14 +48,11 @@ export default function ViewPicksPage({ user }) {
         };
       });
 
-      // 4. Sort by game_date ascending
       picks.sort((a, b) => new Date(a.game_date) - new Date(b.game_date));
-
       setSavedPicks(picks);
 
       if (picks.length > 0) {
-        const earliestGame = picks[0].game_date ? new Date(picks[0].game_date) : null;
-        setFirstGameStart(earliestGame);
+        setFirstGameStart(new Date(picks[0].game_date));
       }
     } catch (err) {
       console.error("Failed to fetch picks", err);
@@ -98,7 +89,6 @@ export default function ViewPicksPage({ user }) {
         .upsert(formattedPicks, { onConflict: ["user_id", "week", "game_id"] });
 
       if (error) throw error;
-
       alert("Picks updated successfully!");
       setEditing(false);
     } catch (err) {
@@ -113,7 +103,7 @@ export default function ViewPicksPage({ user }) {
   if (error) return <p style={{ color: "red" }}>{error}</p>;
 
   return (
-    <div style={{ maxWidth: 900, margin: "auto", padding: 20 }}>
+    <div style={{ maxWidth: 900, margin: "auto", padding: "20px 10px" }}>
       <button
         onClick={() => navigate("/")}
         style={{
@@ -137,13 +127,15 @@ export default function ViewPicksPage({ user }) {
           onClick={() => setEditing(true)}
           style={{
             marginBottom: 20,
-            padding: "8px 16px",
+            padding: "10px 16px",
             backgroundColor: "#ffc107",
             color: "black",
             border: "none",
             borderRadius: 6,
             cursor: "pointer",
             fontWeight: 600,
+            width: "100%",
+            maxWidth: "250px",
           }}
         >
           Edit Picks
@@ -156,50 +148,57 @@ export default function ViewPicksPage({ user }) {
         </p>
       )}
 
-      <table style={{ width: "100%", borderCollapse: "collapse" }}>
-        <thead>
-          <tr style={{ backgroundColor: "#f0f0f0", textAlign: "left" }}>
-            <th style={{ padding: "8px" }}>Date / Time (ET)</th>
-            <th style={{ padding: "8px" }}>Home Team</th>
-            <th style={{ padding: "8px" }}>Away Team</th>
-            <th style={{ padding: "8px" }}>Your Pick</th>
-          </tr>
-        </thead>
-        <tbody>
-          {savedPicks.map((pick) => (
-            <tr key={pick.game_id} style={{ borderBottom: "1px solid #ddd" }}>
-              <td style={{ padding: "8px" }}>
-                {new Date(pick.game_date).toLocaleString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                  hour: "numeric",
-                  minute: "numeric",
-                  hour12: true,
-                  timeZone: "America/New_York",
-                })}
-              </td>
-              <td style={{ padding: "8px" }}>{pick.home_team}</td>
-              <td style={{ padding: "8px" }}>{pick.away_team}</td>
-              <td style={{ padding: "8px", fontWeight: 600, color: "#0078d7" }}>
-                {editing ? (
-                  <select
-                    value={pick.picked_team}
-                    onChange={(e) =>
-                      handlePickChange(pick.game_id, e.target.value)
-                    }
-                    disabled={picksLocked || saving}
-                  >
-                    <option value={pick.home_team}>{pick.home_team}</option>
-                    <option value={pick.away_team}>{pick.away_team}</option>
-                  </select>
-                ) : (
-                  pick.picked_team
-                )}
-              </td>
+      <div style={{ overflowX: "auto" }}>
+        <table
+          style={{
+            width: "100%",
+            minWidth: "320px",
+            borderCollapse: "collapse",
+          }}
+        >
+          <thead>
+            <tr style={{ backgroundColor: "#f0f0f0", textAlign: "left" }}>
+              <th style={{ padding: "8px" }}>Date / Time (ET)</th>
+              <th style={{ padding: "8px" }}>Home Team</th>
+              <th style={{ padding: "8px" }}>Away Team</th>
+              <th style={{ padding: "8px" }}>Your Pick</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {savedPicks.map((pick) => (
+              <tr key={pick.game_id} style={{ borderBottom: "1px solid #ddd" }}>
+                <td style={{ padding: "8px", fontSize: "0.9rem" }}>
+                  {new Date(pick.game_date).toLocaleString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    hour: "numeric",
+                    minute: "numeric",
+                    hour12: true,
+                    timeZone: "America/New_York",
+                  })}
+                </td>
+                <td style={{ padding: "8px", fontWeight: 600 }}>{pick.home_team}</td>
+                <td style={{ padding: "8px" }}>{pick.away_team}</td>
+                <td style={{ padding: "8px", fontWeight: 600, color: "#0078d7" }}>
+                  {editing ? (
+                    <select
+                      value={pick.picked_team}
+                      onChange={(e) => handlePickChange(pick.game_id, e.target.value)}
+                      disabled={picksLocked || saving}
+                      style={{ padding: "4px", fontSize: "0.9rem" }}
+                    >
+                      <option value={pick.home_team}>{pick.home_team}</option>
+                      <option value={pick.away_team}>{pick.away_team}</option>
+                    </select>
+                  ) : (
+                    pick.picked_team
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
       {editing && !picksLocked && (
         <div style={{ marginTop: 20, textAlign: "center" }}>
@@ -215,6 +214,8 @@ export default function ViewPicksPage({ user }) {
               fontWeight: 600,
               cursor: saving ? "not-allowed" : "pointer",
               opacity: saving ? 0.7 : 1,
+              width: "100%",
+              maxWidth: "250px",
             }}
           >
             {saving ? "Saving..." : "Save Changes"}

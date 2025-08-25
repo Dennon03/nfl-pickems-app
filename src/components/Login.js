@@ -18,12 +18,11 @@ export default function Login({ onLogin }) {
     setError(null);
 
     try {
-      // Try to fetch existing user
       const { data, error: selectError } = await supabase
         .from("users")
         .select("*")
         .eq("username", trimmedUsername)
-        .maybeSingle(); // ✅ does not throw if no rows
+        .maybeSingle();
 
       if (selectError) {
         setError(selectError.message);
@@ -33,14 +32,11 @@ export default function Login({ onLogin }) {
       let user = data;
 
       if (!user) {
-        // Ask before creating
         const create = window.confirm(
           `Username "${trimmedUsername}" not found. Would you like to create a new account?`
         );
-
         if (!create) return;
 
-        // Create new user
         const { data: newUser, error: insertError } = await supabase
           .from("users")
           .insert([{ username: trimmedUsername }])
@@ -55,7 +51,6 @@ export default function Login({ onLogin }) {
         user = newUser;
       }
 
-      // ✅ Pass user info to parent
       onLogin(user);
     } catch (err) {
       console.error(err);
@@ -73,7 +68,7 @@ export default function Login({ onLogin }) {
         style={{
           width: "100%",
           height: "100%",
-          objectFit: "fill",
+          objectFit: "cover",
           zIndex: -1,
         }}
       />
@@ -89,14 +84,17 @@ export default function Login({ onLogin }) {
           flexDirection: "column",
           justifyContent: "center",
           alignItems: "center",
+          padding: "0 20px",
           gap: "1rem",
         }}
       >
         <h2
           style={{
-            color: "#ffffffff",
-            fontSize: "4rem",
+            color: "#fff",
+            fontSize: "3rem",
+            textAlign: "center",
             textShadow: "2px 2px 4px rgba(0,0,0,0.7)",
+            margin: 0,
           }}
         >
           Login
@@ -111,14 +109,15 @@ export default function Login({ onLogin }) {
           placeholder="Enter username"
           disabled={loading}
           style={{
-            padding: "10px 15px",
+            padding: "12px 15px",
             borderRadius: "8px",
             border: "1px solid #ccc",
             outline: "none",
-            width: "250px",
+            width: "80%",
+            maxWidth: "400px",
             backgroundColor: "rgba(255, 255, 255, 0.85)",
             color: "#000",
-            fontSize: "16px",
+            fontSize: "1rem",
             textAlign: "center",
           }}
         />
@@ -127,21 +126,29 @@ export default function Login({ onLogin }) {
           onClick={handleLogin}
           disabled={loading}
           style={{
-            padding: "10px 20px",
+            padding: "12px 20px",
             borderRadius: "8px",
             border: "none",
-            backgroundColor: "hsla(24, 100%, 50%, 1.00)",
+            backgroundColor: "#ff6600",
             color: "#fff",
-            fontSize: "16px",
-            cursor: "pointer",
-            width: "150px",
+            fontSize: "1rem",
+            cursor: loading ? "not-allowed" : "pointer",
+            width: "80%",
+            maxWidth: "250px",
           }}
         >
           {loading ? "Joining..." : "Join Game"}
         </button>
 
         {error && (
-          <p style={{ color: "red", marginTop: "10px", fontWeight: "bold" }}>
+          <p
+            style={{
+              color: "red",
+              marginTop: "10px",
+              fontWeight: "bold",
+              textAlign: "center",
+            }}
+          >
             {error}
           </p>
         )}
