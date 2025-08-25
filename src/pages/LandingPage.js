@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "../supabaseClient";
 
 export default function LandingPage({ user }) {
@@ -7,9 +7,10 @@ export default function LandingPage({ user }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [currentWeek, setCurrentWeek] = useState(null);
-  const [hasSavedPicks, setHasSavedPicks] = useState(false); // default false
+  const [hasSavedPicks, setHasSavedPicks] = useState(false);
   const [checkingPicks, setCheckingPicks] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation(); // ✅ used to check for picksSaved
 
   useEffect(() => {
     const fetchGames = async () => {
@@ -52,41 +53,41 @@ export default function LandingPage({ user }) {
     fetchGames();
   }, []);
 
-  // Fetch picks status once per session
+  // Check picks status, also handle picksSaved from navigation
   useEffect(() => {
     const checkPicksStatus = async () => {
       if (!user || !currentWeek) return;
 
-      const cached = sessionStorage.getItem(`hasSavedPicks_week_${currentWeek}_${user.id}`);
-      if (cached !== null) {
-        setHasSavedPicks(cached === "true");
-        return;
-      }
-
       setCheckingPicks(true);
       try {
+        // If navigation indicates picks were just saved, update immediately
+        if (location.state?.picksSaved) {
+          setHasSavedPicks(true);
+          // Clear the state to avoid repeated triggers
+          navigate(location.pathname, { replace: true, state: {} });
+          setCheckingPicks(false);
+          return;
+        }
+
         const { data: status, error } = await supabase
           .from("user_week_picks_status")
           .select("has_picks")
           .eq("user_id", user.id)
           .eq("week", currentWeek)
           .single();
-        if (error) throw error;
 
-        const saved = status?.has_picks || false;
-        setHasSavedPicks(saved);
-        sessionStorage.setItem(`hasSavedPicks_week_${currentWeek}_${user.id}`, saved.toString());
+        if (error && error.code !== "PGRST116") throw error; // ignore "no rows found"
+        setHasSavedPicks(status?.has_picks || false);
       } catch (err) {
         console.error(err);
         setHasSavedPicks(false);
-        sessionStorage.setItem(`hasSavedPicks_week_${currentWeek}_${user.id}`, "false");
       } finally {
         setCheckingPicks(false);
       }
     };
 
     checkPicksStatus();
-  }, [user, currentWeek]);
+  }, [user, currentWeek, location.state, navigate]);
 
   if (loading) return <p>Loading games...</p>;
   if (error) return <p style={{ color: "red" }}>{error}</p>;
@@ -107,7 +108,6 @@ export default function LandingPage({ user }) {
               flexWrap: "wrap",
             }}
           >
-            {/* Always render the button to avoid layout shift */}
             <button
               disabled={checkingPicks}
               onClick={() =>

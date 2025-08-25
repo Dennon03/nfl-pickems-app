@@ -128,7 +128,8 @@ export default function PicksPage({ user }) {
         }, { onConflict: ["user_id", "week"] });
       if (statusError) throw statusError;
 
-      navigate(`/view-picks?week=${week}`);
+      // ✅ Pass a flag so LandingPage can update button immediately
+      navigate(`/view-picks?week=${week}`, { state: { picksSaved: true } });
     } catch (err) {
       console.error("Failed to save picks or update status", err);
       alert("Failed to save picks. Please try again.");
