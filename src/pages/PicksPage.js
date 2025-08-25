@@ -1,13 +1,9 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
-import { useNavigate, useSearchParams } from "react-router-dom";
-import { API_BASE } from "../api";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "../supabaseClient";
 
 export default function PicksPage({ user }) {
-  const [searchParams] = useSearchParams();
-  const weekParam = Number(searchParams.get("week"));
-  const [week, setWeek] = useState(weekParam || null);
-
+  const [week, setWeek] = useState(null);
   const [games, setGames] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -15,48 +11,97 @@ export default function PicksPage({ user }) {
   const [saving, setSaving] = useState(false);
   const navigate = useNavigate();
 
+  // Fetch current week dynamically
   useEffect(() => {
-    const fetchWeekIfNotSet = async () => {
-      if (!week) {
-        try {
-          // Fetch current week from server
-          const res = await axios.get(`${API_BASE}/current-week`);
-          setWeek(res.data.week);
-        } catch (err) {
-          console.error("Failed to fetch current week, defaulting to 1");
-          setWeek(1);
-        }
+    const fetchCurrentWeek = async () => {
+      try {
+        const today = new Date().toISOString().split("T")[0]; // "YYYY-MM-DD"
+        const { data: weeksData, error } = await supabase
+          .from("weeks")
+          .select("*")
+          .order("week_number", { ascending: true });
+
+        if (error) throw error;
+        if (!weeksData || weeksData.length === 0) throw new Error("No weeks found");
+
+        // Find current week based on today's date
+        const currentWeekObj =
+          weeksData.find((w) => today >= w.start_date && today <= w.end_date) ||
+          weeksData[0]; // fallback to first week
+
+        setWeek(currentWeekObj.week_number);
+      } catch (err) {
+        console.error("Failed to fetch current week", err);
+        setError("Failed to determine current week");
       }
     };
-    fetchWeekIfNotSet();
-  }, [week]);
 
+    fetchCurrentWeek();
+  }, []);
+
+  // Fetch games for the current week
   useEffect(() => {
-    if (!week) return; // Wait until week is determined
+    if (!week) return;
 
     const fetchGames = async () => {
+      setLoading(true);
       try {
-        const res = await axios.get(`${API_BASE}/games`, { params: { week } });
-        setGames(res.data);
+        const { data: gamesData, error } = await supabase
+          .from("games")
+          .select("*")
+          .eq("week_id", week)
+          .order("game_date", { ascending: true });
+
+        if (error) throw error;
+        setGames(gamesData || []);
       } catch (err) {
-        setError("Failed to load games");
         console.error(err);
+        setError("Failed to load games");
       } finally {
         setLoading(false);
       }
     };
+
     fetchGames();
   }, [week]);
 
+  // Fetch user picks for this week
+  useEffect(() => {
+    if (!week || !user) return;
+
+    const fetchPicks = async () => {
+      try {
+        const { data: userPicks, error } = await supabase
+          .from("user_picks")
+          .select("game_id, picked_team")
+          .eq("week", week)
+          .eq("user_id", user.id);
+
+        if (error) throw error;
+
+        const picksMap = {};
+        userPicks.forEach((pick) => {
+          picksMap[pick.game_id] = pick.picked_team;
+        });
+        setPicks(picksMap);
+      } catch (err) {
+        console.error("Failed to fetch picks", err);
+      }
+    };
+
+    fetchPicks();
+  }, [week, user]);
+
+  // Determine if picks are locked
   const now = new Date();
   const firstGameStart = games.length
     ? new Date(Math.min(...games.map((g) => new Date(g.game_date))))
     : null;
   const picksDisabled = firstGameStart && now >= firstGameStart;
 
-  const handlePickChange = (gameCode, team) => {
+  const handlePickChange = (gameId, team) => {
     if (picksDisabled) return;
-    setPicks((prev) => ({ ...prev, [gameCode]: team }));
+    setPicks((prev) => ({ ...prev, [gameId]: team }));
   };
 
   const savePicks = async () => {
@@ -64,7 +109,6 @@ export default function PicksPage({ user }) {
       alert("User not logged in!");
       return;
     }
-
     if (Object.keys(picks).length !== games.length) {
       alert("It looks like you forgot to pick a game!");
       return;
@@ -72,19 +116,23 @@ export default function PicksPage({ user }) {
 
     setSaving(true);
     try {
-      await axios.post(`${API_BASE}/save-picks`, {
-        userId: user.id,
-        week,
-        picks,
-      });
+      const formattedPicks = games.map((game) => ({
+        user_id: user.id, // UUID string from Supabase Auth
+        week: week,
+        game_id: game.game_code,
+        picked_team: picks[game.game_code],
+      }));
+
+      const { data, error } = await supabase
+        .from("user_picks")
+        .upsert(formattedPicks, { onConflict: ["user_id", "week", "game_id"] });
+
+      if (error) throw error;
+      console.log("Picks saved:", data);
       navigate(`/view-picks?week=${week}`);
     } catch (err) {
-      console.error(err);
-      if (err.response && err.response.status === 403) {
-        alert(err.response.data.error || "Picks are locked for this week.");
-      } else {
-        alert("Failed to save picks. Please try again.");
-      }
+      console.error("Failed to save picks", err);
+      alert("Failed to save picks. Please try again.");
     } finally {
       setSaving(false);
     }
