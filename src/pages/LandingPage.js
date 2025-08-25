@@ -203,11 +203,20 @@ export default function LandingPage({ user }) {
             </table>
           </div>
 
-          {gamesByWeek[week][0]?.bye_teams?.length > 0 && (
-            <p style={{ marginTop: 10, fontStyle: "italic", color: "#555", textAlign: "center" }}>
-              Byes: {gamesByWeek[week][0].bye_teams.join(", ")}
-            </p>
-          )}
+          {(() => {
+            let byeTeams = [];
+            try {
+              const raw = gamesByWeek[week][0]?.bye_teams;
+              byeTeams = raw ? JSON.parse(raw) : [];
+            } catch (e) {
+              console.warn("Failed to parse bye_teams:", gamesByWeek[week][0]?.bye_teams);
+            }
+            return byeTeams.length > 0 ? (
+              <p style={{ marginTop: 10, fontStyle: "italic", color: "#555", textAlign: "center" }}>
+                Byes: {byeTeams.join(", ")}
+              </p>
+            ) : null;
+          })()}
         </div>
       ))}
     </div>
