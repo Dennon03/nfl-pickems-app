@@ -19,6 +19,7 @@ export default function LandingPage({ user }) {
           .from("games")
           .select("*")
           .order("game_date", { ascending: true });
+          console.log("Fetched games:", games);
 
         if (error) throw error;
 
