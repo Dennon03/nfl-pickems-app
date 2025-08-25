@@ -26,6 +26,7 @@ export default function ResultsPage({ user }) {
           .from("games")
           .select("game_code, game_date, home_team, away_team, home_score, away_score")
           .in("game_code", gameIds);
+
         if (gamesError) throw gamesError;
 
         const combined = picksData.map((pick) => {
@@ -52,6 +53,7 @@ export default function ResultsPage({ user }) {
         });
 
         combined.sort((a, b) => a.week - b.week || new Date(a.game_date) - new Date(b.game_date));
+
         setResults(combined);
       } catch (err) {
         console.error("Error fetching results:", err);
@@ -63,15 +65,13 @@ export default function ResultsPage({ user }) {
     if (user?.id) fetchResults();
   }, [user]);
 
-  if (loading) return <p>Loading results...</p>;
-  if (results.length === 0) return <p>No results found.</p>;
-
   const weeks = [...new Set(results.map((r) => r.week))].sort((a, b) => b - a);
   const grandTotalCorrect = results.filter((g) => g.picked_team === g.winner_team).length;
 
+  // Always render the Back button
   return (
     <div style={{ maxWidth: 900, margin: "auto", padding: 20 }}>
-      <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", marginBottom: 20 }}>
         <button
           style={{
             padding: "8px 16px",
@@ -84,72 +84,88 @@ export default function ResultsPage({ user }) {
           }}
           onClick={() => navigate("/")}
         >
-          ⬅ Back to Home Page
+          ⬅ Back to Home
         </button>
-        <h2 style={{ margin: 0, fontSize: "1rem", flex: "1 0 100%" }}>
-          Grand Total: {grandTotalCorrect} / {results.length} correct overall!
-        </h2>
       </div>
 
-      {weeks.map((week) => {
-        const weekResults = results.filter((r) => r.week === week);
-        const correctCount = weekResults.filter((g) => g.picked_team === g.winner_team).length;
+      {loading ? (
+        <p>Loading results...</p>
+      ) : results.length === 0 ? (
+        <p>No results found.</p>
+      ) : (
+        <>
+          <h2 style={{ marginBottom: 20 }}>
+            Grand Total: {grandTotalCorrect} / {results.length} correct overall!
+          </h2>
 
-        return (
-          <div key={week} style={{ marginBottom: 40 }}>
-            <h1 style={{ fontSize: "1.2rem" }}>Week {week} Results</h1>
-            <h2 style={{ marginBottom: 20, fontSize: "1rem" }}>
-              You got {correctCount} / {weekResults.length} correct for Week {week}!
-            </h2>
+          {weeks.map((week) => {
+            const weekResults = results.filter((r) => r.week === week);
+            const correctCount = weekResults.filter((g) => g.picked_team === g.winner_team).length;
 
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", minWidth: 600, borderCollapse: "collapse", fontSize: "0.9rem" }}>
-                <thead>
-                  <tr style={{ backgroundColor: "#f0f0f0", textAlign: "left" }}>
-                    <th style={{ padding: "8px" }}>Date / Time (ET)</th>
-                    <th style={{ padding: "8px" }}>Home Team</th>
-                    <th style={{ padding: "8px" }}>Away Team</th>
-                    <th style={{ padding: "8px" }}>Your Pick</th>
-                    <th style={{ padding: "8px" }}>Winner</th>
-                    <th style={{ padding: "8px" }}>Score</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {weekResults.map((game) => (
-                    <tr
-                      key={game.game_id}
-                      style={{
-                        borderBottom: "1px solid #ddd",
-                        backgroundColor:
-                          game.picked_team === game.winner_team ? "#d4edda" : "#f8d7da",
-                      }}
-                    >
-                      <td style={{ padding: "8px" }}>
-                        {game.game_date &&
-                          new Date(game.game_date).toLocaleString("en-US", {
-                            month: "short",
-                            day: "numeric",
-                            hour: "numeric",
-                            minute: "numeric",
-                            hour12: true,
-                            timeZone: "America/New_York",
-                          })}
-                      </td>
-                      <td style={{ padding: "8px", fontWeight: "600" }}>{game.home_team}</td>
-                      <td style={{ padding: "8px" }}>{game.away_team}</td>
-                      <td style={{ padding: "8px" }}>{game.picked_team}</td>
-                      <td style={{ padding: "8px" }}>{game.winner_team}</td>
-                      <td style={{ padding: "8px" }}>
-                        {game.home_score ?? "-"} - {game.away_score ?? "-"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        );
-      })}
+            return (
+              <div key={week} style={{ marginBottom: 40 }}>
+                <h1>Week {week} Results</h1>
+                <h2 style={{ marginBottom: 20 }}>
+                  You got {correctCount} / {weekResults.length} correct for Week {week}!
+                </h2>
+
+                <div style={{ overflowX: "auto" }}>
+                  <table
+                    style={{
+                      width: "100%",
+                      minWidth: 500,
+                      borderCollapse: "collapse",
+                      fontSize: "0.9rem",
+                    }}
+                  >
+                    <thead>
+                      <tr style={{ backgroundColor: "#f0f0f0", textAlign: "left" }}>
+                        <th style={{ padding: "8px" }}>Date / Time (ET)</th>
+                        <th style={{ padding: "8px" }}>Home Team</th>
+                        <th style={{ padding: "8px" }}>Away Team</th>
+                        <th style={{ padding: "8px" }}>Your Pick</th>
+                        <th style={{ padding: "8px" }}>Winner</th>
+                        <th style={{ padding: "8px" }}>Score</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {weekResults.map((game) => (
+                        <tr
+                          key={game.game_id}
+                          style={{
+                            borderBottom: "1px solid #ddd",
+                            backgroundColor:
+                              game.picked_team === game.winner_team ? "#d4edda" : "#f8d7da",
+                          }}
+                        >
+                          <td style={{ padding: "8px" }}>
+                            {game.game_date &&
+                              new Date(game.game_date).toLocaleString("en-US", {
+                                month: "short",
+                                day: "numeric",
+                                hour: "numeric",
+                                minute: "numeric",
+                                hour12: true,
+                                timeZone: "America/New_York",
+                              })}
+                          </td>
+                          <td style={{ padding: "8px", fontWeight: "600" }}>{game.home_team}</td>
+                          <td style={{ padding: "8px" }}>{game.away_team}</td>
+                          <td style={{ padding: "8px" }}>{game.picked_team}</td>
+                          <td style={{ padding: "8px" }}>{game.winner_team}</td>
+                          <td style={{ padding: "8px" }}>
+                            {game.home_score ?? "-"} - {game.away_score ?? "-"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+          })}
+        </>
+      )}
     </div>
   );
 }

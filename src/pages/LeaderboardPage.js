@@ -9,7 +9,6 @@ export default function LeaderboardPage() {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  // Determine the week to display
   useEffect(() => {
     const fetchCurrentWeek = async () => {
       try {
@@ -93,13 +92,10 @@ export default function LeaderboardPage() {
     fetchLeaderboard();
   }, [week]);
 
-  if (loading) return <p>Loading leaderboard...</p>;
-  if (!week) return <p>No completed weeks yet.</p>;
-  if (leaderboard.length === 0) return <p>No results found for Week {week}.</p>;
-
+  // Always show the back button
   return (
     <div style={{ maxWidth: 700, margin: "auto", padding: 20 }}>
-      <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "flex-start", marginBottom: 20 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", marginBottom: 20 }}>
         <button
           style={{
             padding: "8px 16px",
@@ -116,38 +112,55 @@ export default function LeaderboardPage() {
         </button>
       </div>
 
-      <h1 style={{ fontSize: "1.2rem" }}>Leaderboard - Week {week}</h1>
-
-      <div style={{ overflowX: "auto" }}>
-        <table style={{ width: "100%", minWidth: 500, borderCollapse: "collapse", fontSize: "0.9rem", marginTop: 20 }}>
-          <thead>
-            <tr style={{ backgroundColor: "#f0f0f0", textAlign: "left" }}>
-              <th style={{ padding: "8px" }}>Rank</th>
-              <th style={{ padding: "8px" }}>User</th>
-              <th style={{ padding: "8px" }}>Correct Picks</th>
-              <th style={{ padding: "8px" }}>Total Picks</th>
-              <th style={{ padding: "8px" }}>Grand Total Correct</th>
-            </tr>
-          </thead>
-          <tbody>
-            {leaderboard.map((user, index) => (
-              <tr
-                key={user.user_id}
-                style={{
-                  borderBottom: "1px solid #ddd",
-                  backgroundColor: index % 2 === 0 ? "#fafafa" : "#fff",
-                }}
-              >
-                <td style={{ padding: "8px" }}>{index + 1}</td>
-                <td style={{ padding: "8px" }}>{user.username}</td>
-                <td style={{ padding: "8px", color: "#28a745", fontWeight: 600 }}>{user.correctCount}</td>
-                <td style={{ padding: "8px" }}>{user.totalPicks}</td>
-                <td style={{ padding: "8px", fontWeight: 600 }}>{grandTotals[user.user_id] ?? 0}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {loading ? (
+        <p>Loading leaderboard...</p>
+      ) : !week ? (
+        <p>No completed weeks yet.</p>
+      ) : leaderboard.length === 0 ? (
+        <p>No results found for Week {week}.</p>
+      ) : (
+        <>
+          <h1 style={{ fontSize: "1.2rem" }}>Leaderboard - Week {week}</h1>
+          <div style={{ overflowX: "auto" }}>
+            <table
+              style={{
+                width: "100%",
+                minWidth: 500,
+                borderCollapse: "collapse",
+                fontSize: "0.9rem",
+                marginTop: 20,
+              }}
+            >
+              <thead>
+                <tr style={{ backgroundColor: "#f0f0f0", textAlign: "left" }}>
+                  <th style={{ padding: "8px" }}>Rank</th>
+                  <th style={{ padding: "8px" }}>User</th>
+                  <th style={{ padding: "8px" }}>Correct Picks</th>
+                  <th style={{ padding: "8px" }}>Total Picks</th>
+                  <th style={{ padding: "8px" }}>Grand Total Correct</th>
+                </tr>
+              </thead>
+              <tbody>
+                {leaderboard.map((user, index) => (
+                  <tr
+                    key={user.user_id}
+                    style={{
+                      borderBottom: "1px solid #ddd",
+                      backgroundColor: index % 2 === 0 ? "#fafafa" : "#fff",
+                    }}
+                  >
+                    <td style={{ padding: "8px" }}>{index + 1}</td>
+                    <td style={{ padding: "8px" }}>{user.username}</td>
+                    <td style={{ padding: "8px", color: "#28a745", fontWeight: 600 }}>{user.correctCount}</td>
+                    <td style={{ padding: "8px" }}>{user.totalPicks}</td>
+                    <td style={{ padding: "8px", fontWeight: 600 }}>{grandTotals[user.user_id] ?? 0}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
     </div>
   );
 }

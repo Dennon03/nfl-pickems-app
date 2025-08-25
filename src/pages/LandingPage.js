@@ -7,7 +7,7 @@ export default function LandingPage({ user }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [currentWeek, setCurrentWeek] = useState(null);
-  const [hasSavedPicks, setHasSavedPicks] = useState(false);
+  const [hasSavedPicks, setHasSavedPicks] = useState(false); // default false
   const [checkingPicks, setCheckingPicks] = useState(false);
   const navigate = useNavigate();
 
@@ -52,9 +52,16 @@ export default function LandingPage({ user }) {
     fetchGames();
   }, []);
 
+  // Fetch picks status once per session
   useEffect(() => {
     const checkPicksStatus = async () => {
       if (!user || !currentWeek) return;
+
+      const cached = sessionStorage.getItem(`hasSavedPicks_week_${currentWeek}_${user.id}`);
+      if (cached !== null) {
+        setHasSavedPicks(cached === "true");
+        return;
+      }
 
       setCheckingPicks(true);
       try {
@@ -66,10 +73,13 @@ export default function LandingPage({ user }) {
           .single();
         if (error) throw error;
 
-        setHasSavedPicks(status?.has_picks || false);
+        const saved = status?.has_picks || false;
+        setHasSavedPicks(saved);
+        sessionStorage.setItem(`hasSavedPicks_week_${currentWeek}_${user.id}`, saved.toString());
       } catch (err) {
         console.error(err);
         setHasSavedPicks(false);
+        sessionStorage.setItem(`hasSavedPicks_week_${currentWeek}_${user.id}`, "false");
       } finally {
         setCheckingPicks(false);
       }
@@ -97,6 +107,7 @@ export default function LandingPage({ user }) {
               flexWrap: "wrap",
             }}
           >
+            {/* Always render the button to avoid layout shift */}
             <button
               disabled={checkingPicks}
               onClick={() =>
@@ -115,7 +126,11 @@ export default function LandingPage({ user }) {
                 flex: "1 1 200px",
               }}
             >
-              {hasSavedPicks ? `View Your Picks (Week ${currentWeek})` : `Make Picks (Week ${currentWeek})`}
+              {checkingPicks
+                ? "Checking your picks…"
+                : hasSavedPicks
+                ? `View Your Picks (Week ${currentWeek})`
+                : `Make Picks (Week ${currentWeek})`}
             </button>
 
             <button
@@ -152,7 +167,6 @@ export default function LandingPage({ user }) {
               Leaderboard (Week {currentWeek})
             </button>
           </div>
-          {checkingPicks && <div style={{ marginTop: 8, color: "#666" }}>Checking your picks…</div>}
         </div>
       )}
 
