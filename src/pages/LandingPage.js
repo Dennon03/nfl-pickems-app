@@ -104,11 +104,89 @@ export default function LandingPage({ user }) {
   };
 
   return (
-    <div style={{ maxWidth: 1000, margin: "auto", padding: "20px 10px" }}>
+    <div style={{ maxWidth: 900, margin: "auto", padding: "20px 10px" }}>
       <h1 style={{ textAlign: "center", marginBottom: 20 }}>
         NFL 2025 Season Games
       </h1>
 
+      {/* Restored buttons section */}
+      {user && currentWeek && gamesByWeek[currentWeek]?.length > 0 && (
+        <div style={{ textAlign: "center", marginBottom: 40 }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "center",
+              gap: "12px",
+              flexWrap: "wrap",
+            }}
+          >
+            <button
+              disabled={checkingPicks}
+              onClick={() =>
+                navigate(
+                  hasSavedPicks
+                    ? `/view-picks?week=${currentWeek}`
+                    : `/picks?week=${currentWeek}`
+                )
+              }
+              style={{
+                padding: "10px 15px",
+                backgroundColor: "#0078d7",
+                color: "white",
+                border: "none",
+                borderRadius: 6,
+                fontWeight: 600,
+                cursor: checkingPicks ? "not-allowed" : "pointer",
+                opacity: checkingPicks ? 0.6 : 1,
+                minWidth: "180px",
+                flex: "1 1 200px",
+              }}
+            >
+              {checkingPicks
+                ? "Checking your picks…"
+                : hasSavedPicks
+                ? `View Your Picks (Week ${currentWeek})`
+                : `Make Picks (Week ${currentWeek})`}
+            </button>
+
+            <button
+              onClick={() => navigate("/results")}
+              style={{
+                padding: "10px 15px",
+                backgroundColor: "#0078d7",
+                color: "white",
+                border: "none",
+                borderRadius: 6,
+                fontWeight: 600,
+                cursor: "pointer",
+                minWidth: "180px",
+                flex: "1 1 200px",
+              }}
+            >
+              View Season Results
+            </button>
+
+            <button
+              onClick={() => navigate("/leaderboard")}
+              style={{
+                padding: "10px 15px",
+                backgroundColor: "#0078d7",
+                color: "white",
+                border: "none",
+                borderRadius: 6,
+                fontWeight: 600,
+                cursor: "pointer",
+                minWidth: "180px",
+                flex: "1 1 200px",
+              }}
+            >
+              Leaderboard (Week {currentWeek})
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Week tables */}
       {availableWeeks.map((week) => (
         <div key={week} style={{ marginBottom: 40 }}>
           <h2
@@ -151,18 +229,20 @@ export default function LandingPage({ user }) {
                   let oddsObj = {};
                   if (game.odds) {
                     try {
-                      oddsObj = typeof game.odds === "string" ? JSON.parse(game.odds) : game.odds;
+                      oddsObj =
+                        typeof game.odds === "string"
+                          ? JSON.parse(game.odds)
+                          : game.odds;
                     } catch (err) {
                       console.error("Failed to parse odds JSON", err);
                     }
                   }
 
-                const homeOdds = oddsObj[game.home_team];
-                const awayOdds = oddsObj[game.away_team];
+                  const homeOdds = oddsObj[game.home_team];
+                  const awayOdds = oddsObj[game.away_team];
 
-                homeTeam = formatTeamWithOdds(game.home_team, homeOdds);
-                awayTeam = formatTeamWithOdds(game.away_team, awayOdds);
-
+                  homeTeam = formatTeamWithOdds(game.home_team, homeOdds);
+                  awayTeam = formatTeamWithOdds(game.away_team, awayOdds);
 
                   return (
                     <tr
