@@ -10,7 +10,7 @@ export default function LandingPage({ user }) {
   const [hasSavedPicks, setHasSavedPicks] = useState(false);
   const [checkingPicks, setCheckingPicks] = useState(false);
   const navigate = useNavigate();
-  const location = useLocation(); // ✅ used to check for picksSaved
+  const location = useLocation();
 
   useEffect(() => {
     const fetchGames = async () => {
@@ -29,13 +29,17 @@ export default function LandingPage({ user }) {
         }, {});
 
         Object.keys(grouped).forEach((wk) => {
-          grouped[wk].sort((a, b) => new Date(a.game_date) - new Date(b.game_date));
+          grouped[wk].sort(
+            (a, b) => new Date(a.game_date) - new Date(b.game_date)
+          );
         });
 
         setGamesByWeek(grouped);
 
         const now = new Date();
-        const weeksSorted = Object.keys(grouped).map(Number).sort((a, b) => a - b);
+        const weeksSorted = Object.keys(grouped)
+          .map(Number)
+          .sort((a, b) => a - b);
         let activeWeek = weeksSorted[0];
         for (let wk of weeksSorted) {
           const weekStart = new Date(grouped[wk][0].game_date);
@@ -53,17 +57,14 @@ export default function LandingPage({ user }) {
     fetchGames();
   }, []);
 
-  // Check picks status, also handle picksSaved from navigation
   useEffect(() => {
     const checkPicksStatus = async () => {
       if (!user || !currentWeek) return;
 
       setCheckingPicks(true);
       try {
-        // If navigation indicates picks were just saved, update immediately
         if (location.state?.picksSaved) {
           setHasSavedPicks(true);
-          // Clear the state to avoid repeated triggers
           navigate(location.pathname, { replace: true, state: {} });
           setCheckingPicks(false);
           return;
@@ -76,7 +77,7 @@ export default function LandingPage({ user }) {
           .eq("week", currentWeek)
           .single();
 
-        if (error && error.code !== "PGRST116") throw error; // ignore "no rows found"
+        if (error && error.code !== "PGRST116") throw error;
         setHasSavedPicks(status?.has_picks || false);
       } catch (err) {
         console.error(err);
@@ -92,87 +93,31 @@ export default function LandingPage({ user }) {
   if (loading) return <p>Loading games...</p>;
   if (error) return <p style={{ color: "red" }}>{error}</p>;
 
-  const availableWeeks = Object.keys(gamesByWeek).map(Number).sort((a, b) => a - b);
+  const availableWeeks = Object.keys(gamesByWeek)
+    .map(Number)
+    .sort((a, b) => a - b);
+
+  const formatTeamWithOdds = (team, odds) => {
+    if (odds === undefined || odds === null || odds === "") return team;
+    const sign = odds > 0 ? `+${odds}` : odds;
+    return `${team} (${sign})`;
+  };
 
   return (
-    <div style={{ maxWidth: 900, margin: "auto", padding: "20px 10px" }}>
-      <h1 style={{ textAlign: "center", marginBottom: 20 }}>NFL 2025 Season Games</h1>
-
-      {user && currentWeek && gamesByWeek[currentWeek]?.length > 0 && (
-        <div style={{ textAlign: "center", marginBottom: 40 }}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "center",
-              gap: "12px",
-              flexWrap: "wrap",
-            }}
-          >
-            <button
-              disabled={checkingPicks}
-              onClick={() =>
-                navigate(hasSavedPicks ? `/view-picks?week=${currentWeek}` : `/picks?week=${currentWeek}`)
-              }
-              style={{
-                padding: "10px 15px",
-                backgroundColor: "#0078d7",
-                color: "white",
-                border: "none",
-                borderRadius: 6,
-                fontWeight: 600,
-                cursor: checkingPicks ? "not-allowed" : "pointer",
-                opacity: checkingPicks ? 0.6 : 1,
-                minWidth: "180px",
-                flex: "1 1 200px",
-              }}
-            >
-              {checkingPicks
-                ? "Checking your picks…"
-                : hasSavedPicks
-                ? `View Your Picks (Week ${currentWeek})`
-                : `Make Picks (Week ${currentWeek})`}
-            </button>
-
-            <button
-              onClick={() => navigate("/results")}
-              style={{
-                padding: "10px 15px",
-                backgroundColor: "#0078d7",
-                color: "white",
-                border: "none",
-                borderRadius: 6,
-                fontWeight: 600,
-                cursor: "pointer",
-                minWidth: "180px",
-                flex: "1 1 200px",
-              }}
-            >
-              View Season Results
-            </button>
-
-            <button
-              onClick={() => navigate("/leaderboard")}
-              style={{
-                padding: "10px 15px",
-                backgroundColor: "#0078d7",
-                color: "white",
-                border: "none",
-                borderRadius: 6,
-                fontWeight: 600,
-                cursor: "pointer",
-                minWidth: "180px",
-                flex: "1 1 200px",
-              }}
-            >
-              Leaderboard (Week {currentWeek})
-            </button>
-          </div>
-        </div>
-      )}
+    <div style={{ maxWidth: 1000, margin: "auto", padding: "20px 10px" }}>
+      <h1 style={{ textAlign: "center", marginBottom: 20 }}>
+        NFL 2025 Season Games
+      </h1>
 
       {availableWeeks.map((week) => (
         <div key={week} style={{ marginBottom: 40 }}>
-          <h2 style={{ borderBottom: "2px solid #0078d7", paddingBottom: 6, color: "#0078d7" }}>
+          <h2
+            style={{
+              borderBottom: "2px solid #0078d7",
+              paddingBottom: 6,
+              color: "#0078d7",
+            }}
+          >
             Week {week}
           </h2>
 
@@ -180,7 +125,7 @@ export default function LandingPage({ user }) {
             <table
               style={{
                 width: "100%",
-                minWidth: "320px",
+                minWidth: "500px",
                 margin: "auto",
                 borderCollapse: "collapse",
                 tableLayout: "fixed",
@@ -199,28 +144,64 @@ export default function LandingPage({ user }) {
                 </tr>
               </thead>
               <tbody>
-                {gamesByWeek[week].map((game) => (
-                  <tr key={game.game_code} style={{ borderBottom: "1px solid #ddd" }}>
-                    <td style={{ padding: "8px", fontSize: "0.9rem" }}>
-                      {new Date(game.game_date).toLocaleString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                        hour: "numeric",
-                        minute: "numeric",
-                        hour12: true,
-                        timeZone: "America/New_York",
-                      })}
-                    </td>
-                    <td style={{ padding: "8px", fontWeight: 600 }}>{game.home_team}</td>
-                    <td style={{ padding: "8px" }}>{game.away_team}</td>
-                  </tr>
-                ))}
+                {gamesByWeek[week].map((game) => {
+                  let homeTeam = game.home_team;
+                  let awayTeam = game.away_team;
+
+                  let oddsObj = {};
+                  if (game.odds) {
+                    try {
+                      oddsObj = typeof game.odds === "string" ? JSON.parse(game.odds) : game.odds;
+                    } catch (err) {
+                      console.error("Failed to parse odds JSON", err);
+                    }
+                  }
+
+                const homeOdds = oddsObj[game.home_team];
+                const awayOdds = oddsObj[game.away_team];
+
+                homeTeam = formatTeamWithOdds(game.home_team, homeOdds);
+                awayTeam = formatTeamWithOdds(game.away_team, awayOdds);
+
+
+                  return (
+                    <tr
+                      key={game.game_code}
+                      style={{
+                        borderBottom: "1px solid #ddd",
+                        textAlign: "center",
+                      }}
+                    >
+                      <td style={{ padding: "8px", fontSize: "0.9rem" }}>
+                        {new Date(game.game_date).toLocaleString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          hour: "numeric",
+                          minute: "numeric",
+                          hour12: true,
+                          timeZone: "America/New_York",
+                        })}
+                      </td>
+                      <td style={{ padding: "8px", fontWeight: 600 }}>
+                        {homeTeam}
+                      </td>
+                      <td style={{ padding: "8px" }}>{awayTeam}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
 
           {gamesByWeek[week][0]?.bye_teams?.length > 0 && (
-            <p style={{ marginTop: 10, fontStyle: "italic", color: "#555", textAlign: "center" }}>
+            <p
+              style={{
+                marginTop: 10,
+                fontStyle: "italic",
+                color: "#555",
+                textAlign: "center",
+              }}
+            >
               Byes: {gamesByWeek[week][0].bye_teams.join(", ")}
             </p>
           )}
