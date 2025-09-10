@@ -9,32 +9,41 @@ export default function LeaderboardPage() {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
+  // ✅ Fetch the latest completed week
   useEffect(() => {
-    const fetchCurrentWeek = async () => {
+    const fetchLatestCompletedWeek = async () => {
       try {
-        const { data: picksData, error: picksError } = await supabase
-          .from("user_picks")
+        const { data: completedGames, error } = await supabase
+          .from("game_results")
           .select("week")
-          .order("week", { ascending: false })
-          .limit(1)
-          .single();
+          .not("winner_team", "is", null)
+          .order("week", { ascending: false });
 
-        if (picksError) throw picksError;
-        setWeek(picksData?.week || 1);
+        if (error) throw error;
+        if (!completedGames || completedGames.length === 0) {
+          setWeek(null);
+          return;
+        }
+
+        // Pick the latest week that has completed games
+        setWeek(completedGames[0].week);
       } catch (err) {
-        console.error("Error fetching current week:", err);
-        setWeek(1);
+        console.error("Error fetching latest completed week:", err);
+        setWeek(null);
       }
     };
-    fetchCurrentWeek();
+
+    fetchLatestCompletedWeek();
   }, []);
 
+  // Fetch leaderboard for the latest completed week
   useEffect(() => {
     if (!week) return;
 
     const fetchLeaderboard = async () => {
       setLoading(true);
       try {
+        // 1️⃣ Fetch picks for the current week
         const { data: picksData, error: picksError } = await supabase
           .from("user_picks")
           .select("user_id, picked_team, week, users!inner(username), game_id")
@@ -49,6 +58,7 @@ export default function LeaderboardPage() {
 
         const gameIds = picksData.map(p => p.game_id).filter(Boolean);
 
+        // 2️⃣ Fetch game results
         const { data: gamesData, error: gamesError } = await supabase
           .from("game_results")
           .select("game_id, home_team, away_team, home_score, away_score, winner_team")
@@ -56,10 +66,18 @@ export default function LeaderboardPage() {
 
         if (gamesError) throw gamesError;
 
+        // 3️⃣ Filter only completed games
+        const completedGameIds = gamesData
+          .filter(g => g.winner_team !== null)
+          .map(g => g.game_id);
+
+        const completedPicks = picksData.filter(p => completedGameIds.includes(p.game_id));
+
+        // 4️⃣ Build leaderboard stats
         const userStats = {};
         const grandTotalsMap = {};
 
-        picksData.forEach((pick) => {
+        completedPicks.forEach(pick => {
           const userId = pick.user_id;
           const username = pick.users?.username ?? "Unknown";
 
@@ -125,7 +143,7 @@ export default function LeaderboardPage() {
                 borderCollapse: "collapse",
                 fontSize: "0.9rem",
                 marginTop: 20,
-                textAlign: "center", // default center for all
+                textAlign: "center",
               }}
             >
               <thead>

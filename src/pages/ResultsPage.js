@@ -40,19 +40,24 @@ export default function ResultsPage({ user }) {
 
         if (gamesError) throw gamesError;
 
-        // 4. Combine picks with results
-        const combined = picksData.map(pick => {
-          const game = gamesData.find(g => g.game_id === pick.game_id);
-          return {
-            ...pick,
-            home_team: game?.home_team || "-",
-            away_team: game?.away_team || "-",
-            home_score: game?.home_score ?? "-",
-            away_score: game?.away_score ?? "-",
-            winner_team: game?.winner_team || "-",
-            game_date: game?.game_date || null,
-          };
-        });
+        // 4. Combine picks with results (only for completed games)
+        const completedGames = gamesData.filter(g => g.winner_team !== null);
+
+        const combined = picksData
+          .map(pick => {
+            const game = completedGames.find(g => g.game_id === pick.game_id);
+            if (!game) return null; // skip picks for games not completed yet
+            return {
+              ...pick,
+              home_team: game.home_team,
+              away_team: game.away_team,
+              home_score: game.home_score,
+              away_score: game.away_score,
+              winner_team: game.winner_team,
+              game_date: game.game_date,
+            };
+          })
+          .filter(Boolean); // remove null entries
 
         combined.sort(
           (a, b) => a.week - b.week || new Date(a.game_date || 0) - new Date(b.game_date || 0)
