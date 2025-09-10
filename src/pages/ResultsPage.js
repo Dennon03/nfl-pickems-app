@@ -10,6 +10,7 @@ export default function ResultsPage({ user }) {
   useEffect(() => {
     const fetchResults = async () => {
       try {
+        // 1. Get user picks
         const { data: picksData, error: picksError } = await supabase
           .from("user_picks")
           .select("game_id, picked_team, week")
@@ -21,38 +22,41 @@ export default function ResultsPage({ user }) {
           return;
         }
 
-        const gameIds = picksData.map((p) => p.game_id);
+        // 2. Filter valid game_ids
+        const gameIds = picksData.map(p => p.game_id).filter(Boolean);
+
+        if (gameIds.length === 0) {
+          setResults([]);
+          return;
+        }
+
+        // 3. Get actual results from game_results
         const { data: gamesData, error: gamesError } = await supabase
-          .from("games")
-          .select("game_code, game_date, home_team, away_team, home_score, away_score")
-          .in("game_code", gameIds);
+          .from("game_results")
+          .select(
+            "game_id, game_date, home_team, away_team, home_score, away_score, winner_team, week"
+          )
+          .in("game_id", gameIds);
 
         if (gamesError) throw gamesError;
 
-        const combined = picksData.map((pick) => {
-          const game = gamesData.find((g) => g.game_code === pick.game_id);
-          let winner_team = null;
-          if (game?.home_score != null && game?.away_score != null) {
-            winner_team =
-              game.home_score > game.away_score
-                ? game.home_team
-                : game.away_score > game.home_score
-                ? game.away_team
-                : "Tie";
-          }
-
+        // 4. Combine picks with results
+        const combined = picksData.map(pick => {
+          const game = gamesData.find(g => g.game_id === pick.game_id);
           return {
             ...pick,
-            home_team: game?.home_team || null,
-            away_team: game?.away_team || null,
-            home_score: game?.home_score ?? null,
-            away_score: game?.away_score ?? null,
+            home_team: game?.home_team || "-",
+            away_team: game?.away_team || "-",
+            home_score: game?.home_score ?? "-",
+            away_score: game?.away_score ?? "-",
+            winner_team: game?.winner_team || "-",
             game_date: game?.game_date || null,
-            winner_team,
           };
         });
 
-        combined.sort((a, b) => a.week - b.week || new Date(a.game_date) - new Date(b.game_date));
+        combined.sort(
+          (a, b) => a.week - b.week || new Date(a.game_date || 0) - new Date(b.game_date || 0)
+        );
 
         setResults(combined);
       } catch (err) {
@@ -65,10 +69,9 @@ export default function ResultsPage({ user }) {
     if (user?.id) fetchResults();
   }, [user]);
 
-  const weeks = [...new Set(results.map((r) => r.week))].sort((a, b) => b - a);
-  const grandTotalCorrect = results.filter((g) => g.picked_team === g.winner_team).length;
+  const weeks = [...new Set(results.map(r => r.week))].sort((a, b) => b - a);
+  const grandTotalCorrect = results.filter(g => g.picked_team === g.winner_team).length;
 
-  // Always render the Back button
   return (
     <div style={{ maxWidth: 900, margin: "auto", padding: 20 }}>
       <div style={{ display: "flex", flexWrap: "wrap", marginBottom: 20 }}>
@@ -98,9 +101,9 @@ export default function ResultsPage({ user }) {
             Grand Total: {grandTotalCorrect} / {results.length} correct overall!
           </h2>
 
-          {weeks.map((week) => {
-            const weekResults = results.filter((r) => r.week === week);
-            const correctCount = weekResults.filter((g) => g.picked_team === g.winner_team).length;
+          {weeks.map(week => {
+            const weekResults = results.filter(r => r.week === week);
+            const correctCount = weekResults.filter(g => g.picked_team === g.winner_team).length;
 
             return (
               <div key={week} style={{ marginBottom: 40 }}>
@@ -120,7 +123,7 @@ export default function ResultsPage({ user }) {
                   >
                     <thead>
                       <tr style={{ backgroundColor: "#f0f0f0", textAlign: "left" }}>
-                        <th style={{ padding: "8px" }}>Date / Time (ET)</th>
+                        <th style={{ padding: "8px" }}>Date</th>
                         <th style={{ padding: "8px" }}>Home Team</th>
                         <th style={{ padding: "8px" }}>Away Team</th>
                         <th style={{ padding: "8px" }}>Your Pick</th>
@@ -129,7 +132,7 @@ export default function ResultsPage({ user }) {
                       </tr>
                     </thead>
                     <tbody>
-                      {weekResults.map((game) => (
+                      {weekResults.map(game => (
                         <tr
                           key={game.game_id}
                           style={{
@@ -140,12 +143,9 @@ export default function ResultsPage({ user }) {
                         >
                           <td style={{ padding: "8px" }}>
                             {game.game_date &&
-                              new Date(game.game_date).toLocaleString("en-US", {
+                              new Date(game.game_date).toLocaleDateString("en-US", {
                                 month: "short",
                                 day: "numeric",
-                                hour: "numeric",
-                                minute: "numeric",
-                                hour12: true,
                                 timeZone: "America/New_York",
                               })}
                           </td>
@@ -154,7 +154,7 @@ export default function ResultsPage({ user }) {
                           <td style={{ padding: "8px" }}>{game.picked_team}</td>
                           <td style={{ padding: "8px" }}>{game.winner_team}</td>
                           <td style={{ padding: "8px" }}>
-                            {game.home_score ?? "-"} - {game.away_score ?? "-"}
+                            {game.home_score} - {game.away_score}
                           </td>
                         </tr>
                       ))}

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../supabaseClient";
+import { useLocation } from "react-router-dom";
 
 export default function PicksPage({ user }) {
   const [week, setWeek] = useState(null);
@@ -11,30 +12,13 @@ export default function PicksPage({ user }) {
   const [saving, setSaving] = useState(false);
   const navigate = useNavigate();
 
-  // Fetch current week dynamically
-  useEffect(() => {
-    const fetchCurrentWeek = async () => {
-      try {
-        const today = new Date().toISOString().split("T")[0];
-        const { data: weeksData, error } = await supabase
-          .from("weeks")
-          .select("*")
-          .order("week_number", { ascending: true });
-        if (error) throw error;
-        if (!weeksData || weeksData.length === 0) throw new Error("No weeks found");
+ const location = useLocation();
+ const params = new URLSearchParams(location.search);
+ const passedWeek = params.get("week");
 
-        const currentWeekObj =
-          weeksData.find((w) => today >= w.start_date && today <= w.end_date) ||
-          weeksData[0];
-        setWeek(currentWeekObj.week_number);
-      } catch (err) {
-        console.error("Failed to fetch current week", err);
-        setError("Failed to determine current week");
-      }
-    };
-
-    fetchCurrentWeek();
-  }, []);
+ useEffect(() => {
+   if (passedWeek) setWeek(Number(passedWeek));
+ }, [passedWeek]);
 
   // Fetch games for the current week
   useEffect(() => {

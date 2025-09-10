@@ -11,7 +11,7 @@ if (!ODDS_API_KEY) {
 
 const sport = "americanfootball_nfl";
 
-const weekGamesByWeek = {
+export const weekGamesByWeek = {
   1: [
     { home: "Philadelphia Eagles", away: "Dallas Cowboys" },
     { home: "Los Angeles Chargers", away: "Kansas City Chiefs" },

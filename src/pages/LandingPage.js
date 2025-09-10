@@ -42,9 +42,12 @@ export default function LandingPage({ user }) {
           .sort((a, b) => a - b);
         let activeWeek = weeksSorted[0];
         for (let wk of weeksSorted) {
-          const weekStart = new Date(grouped[wk][0].game_date);
-          if (now >= weekStart) activeWeek = wk;
-          else break;
+          const weekEnd = new Date(
+            grouped[wk][grouped[wk].length - 1].game_date
+          );
+          if (now > weekEnd) {
+            activeWeek = wk + 1;
+          }
         }
         setCurrentWeek(activeWeek);
       } catch (err) {
@@ -180,7 +183,7 @@ export default function LandingPage({ user }) {
                 flex: "1 1 200px",
               }}
             >
-              Leaderboard (Week {currentWeek})
+              Leaderboard (Week {currentWeek - 1})
             </button>
           </div>
         </div>

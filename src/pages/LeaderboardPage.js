@@ -18,6 +18,7 @@ export default function LeaderboardPage() {
           .order("week", { ascending: false })
           .limit(1)
           .single();
+
         if (picksError) throw picksError;
         setWeek(picksData?.week || 1);
       } catch (err) {
@@ -36,13 +37,7 @@ export default function LeaderboardPage() {
       try {
         const { data: picksData, error: picksError } = await supabase
           .from("user_picks")
-          .select(`
-            user_id,
-            picked_team,
-            week,
-            users(username),
-            games(home_team, away_team, home_score, away_score)
-          `)
+          .select("user_id, picked_team, week, users!inner(username), game_id")
           .eq("week", week);
 
         if (picksError) throw picksError;
@@ -52,27 +47,29 @@ export default function LeaderboardPage() {
           return;
         }
 
+        const gameIds = picksData.map(p => p.game_id).filter(Boolean);
+
+        const { data: gamesData, error: gamesError } = await supabase
+          .from("game_results")
+          .select("game_id, home_team, away_team, home_score, away_score, winner_team")
+          .in("game_id", gameIds);
+
+        if (gamesError) throw gamesError;
+
         const userStats = {};
         const grandTotalsMap = {};
 
         picksData.forEach((pick) => {
           const userId = pick.user_id;
-          const username = pick.users?.username || "Unknown";
+          const username = pick.users?.username ?? "Unknown";
 
-          const game = pick.games;
-          let winner_team = null;
-          if (game?.home_score != null && game?.away_score != null) {
-            winner_team =
-              game.home_score > game.away_score
-                ? game.home_team
-                : game.away_score > game.home_score
-                ? game.away_team
-                : "Tie";
-          }
+          const game = gamesData.find(g => g.game_id === pick.game_id);
+          const winner_team = game?.winner_team ?? null;
 
           if (!userStats[userId]) {
             userStats[userId] = { user_id: userId, username, correctCount: 0, totalPicks: 0 };
           }
+
           userStats[userId].totalPicks += 1;
           if (pick.picked_team === winner_team) userStats[userId].correctCount += 1;
 
@@ -92,10 +89,10 @@ export default function LeaderboardPage() {
     fetchLeaderboard();
   }, [week]);
 
-  // Always show the back button
   return (
     <div style={{ maxWidth: 700, margin: "auto", padding: 20 }}>
-      <div style={{ display: "flex", flexWrap: "wrap", marginBottom: 20 }}>
+      {/* Back button top-left */}
+      <div style={{ display: "flex", justifyContent: "flex-start", marginBottom: 20 }}>
         <button
           style={{
             padding: "8px 16px",
@@ -104,7 +101,6 @@ export default function LeaderboardPage() {
             border: "none",
             borderRadius: 4,
             cursor: "pointer",
-            marginBottom: 10,
           }}
           onClick={() => navigate("/")}
         >
@@ -113,14 +109,14 @@ export default function LeaderboardPage() {
       </div>
 
       {loading ? (
-        <p>Loading leaderboard...</p>
+        <p style={{ textAlign: "center" }}>Loading leaderboard...</p>
       ) : !week ? (
-        <p>No completed weeks yet.</p>
+        <p style={{ textAlign: "center" }}>No completed weeks yet.</p>
       ) : leaderboard.length === 0 ? (
-        <p>No results found for Week {week}.</p>
+        <p style={{ textAlign: "center" }}>No results found for Week {week}.</p>
       ) : (
         <>
-          <h1 style={{ fontSize: "1.2rem" }}>Leaderboard - Week {week}</h1>
+          <h1 style={{ fontSize: "1.2rem", textAlign: "center" }}>Leaderboard - Week {week}</h1>
           <div style={{ overflowX: "auto" }}>
             <table
               style={{
@@ -129,10 +125,11 @@ export default function LeaderboardPage() {
                 borderCollapse: "collapse",
                 fontSize: "0.9rem",
                 marginTop: 20,
+                textAlign: "center", // default center for all
               }}
             >
               <thead>
-                <tr style={{ backgroundColor: "#f0f0f0", textAlign: "left" }}>
+                <tr style={{ backgroundColor: "#f0f0f0" }}>
                   <th style={{ padding: "8px" }}>Rank</th>
                   <th style={{ padding: "8px" }}>User</th>
                   <th style={{ padding: "8px" }}>Correct Picks</th>
