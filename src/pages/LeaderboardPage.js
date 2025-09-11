@@ -156,21 +156,34 @@ export default function LeaderboardPage() {
                 </tr>
               </thead>
               <tbody>
-                {leaderboard.map((user, index) => (
-                  <tr
-                    key={user.user_id}
-                    style={{
-                      borderBottom: "1px solid #ddd",
-                      backgroundColor: index % 2 === 0 ? "#fafafa" : "#fff",
-                    }}
-                  >
-                    <td style={{ padding: "8px" }}>{index + 1}</td>
-                    <td style={{ padding: "8px" }}>{user.username}</td>
-                    <td style={{ padding: "8px", color: "#28a745", fontWeight: 600 }}>{user.correctCount}</td>
-                    <td style={{ padding: "8px" }}>{user.totalPicks}</td>
-                    <td style={{ padding: "8px", fontWeight: 600 }}>{grandTotals[user.user_id] ?? 0}</td>
-                  </tr>
-                ))}
+                {(() => {
+                  let lastScore = null;
+                  let lastRank = 0;
+
+                  return leaderboard.map((user, index) => {
+                    if (user.correctCount !== lastScore) {
+                      lastRank = lastRank + 1;
+                      lastScore = user.correctCount;
+                    }
+                    // If user.correctCount === lastScore, lastRank stays the same
+
+                    return (
+                      <tr
+                        key={user.user_id}
+                        style={{
+                          borderBottom: "1px solid #ddd",
+                          backgroundColor: index % 2 === 0 ? "#fafafa" : "#fff",
+                        }}
+                      >
+                        <td style={{ padding: "8px" }}>{lastRank}</td>
+                        <td style={{ padding: "8px" }}>{user.username}</td>
+                        <td style={{ padding: "8px", color: "#28a745", fontWeight: 600 }}>{user.correctCount}</td>
+                        <td style={{ padding: "8px" }}>{user.totalPicks}</td>
+                        <td style={{ padding: "8px", fontWeight: 600 }}>{grandTotals[user.user_id] ?? 0}</td>
+                      </tr>
+                    );
+                  });
+                })()}
               </tbody>
             </table>
           </div>
