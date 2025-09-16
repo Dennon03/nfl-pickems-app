@@ -58,29 +58,26 @@ export default function LeaderboardPage() {
 
         const gameIds = picksData.map(p => p.game_id).filter(Boolean);
 
-        // 2️⃣ Fetch game results
+        // 2️⃣ Fetch game results for current week
         const { data: gamesData, error: gamesError } = await supabase
           .from("game_results")
-          .select("game_id, home_team, away_team, home_score, away_score, winner_team")
+          .select("game_id, winner_team")
           .in("game_id", gameIds);
 
         if (gamesError) throw gamesError;
 
-        // 3️⃣ Filter only completed games
+        // 3️⃣ Completed games
         const completedGameIds = gamesData
           .filter(g => g.winner_team !== null)
           .map(g => g.game_id);
 
         const completedPicks = picksData.filter(p => completedGameIds.includes(p.game_id));
 
-        // 4️⃣ Build leaderboard stats
+        // 4️⃣ Build leaderboard stats for this week
         const userStats = {};
-        const grandTotalsMap = {};
-
         completedPicks.forEach(pick => {
           const userId = pick.user_id;
           const username = pick.users?.username ?? "Unknown";
-
           const game = gamesData.find(g => g.game_id === pick.game_id);
           const winner_team = game?.winner_team ?? null;
 
@@ -90,12 +87,36 @@ export default function LeaderboardPage() {
 
           userStats[userId].totalPicks += 1;
           if (pick.picked_team === winner_team) userStats[userId].correctCount += 1;
-
-          if (!grandTotalsMap[userId]) grandTotalsMap[userId] = 0;
-          if (pick.picked_team === winner_team) grandTotalsMap[userId] += 1;
         });
 
         setLeaderboard(Object.values(userStats).sort((a, b) => b.correctCount - a.correctCount));
+
+        // 5️⃣ Fetch ALL picks to build grand totals
+        const { data: allPicks, error: allPicksError } = await supabase
+          .from("user_picks")
+          .select("user_id, picked_team, game_id");
+
+        if (allPicksError) throw allPicksError;
+
+        const allGameIds = allPicks.map(p => p.game_id).filter(Boolean);
+
+        const { data: allGames, error: allGamesError } = await supabase
+          .from("game_results")
+          .select("game_id, winner_team")
+          .in("game_id", allGameIds);
+
+        if (allGamesError) throw allGamesError;
+
+        const grandTotalsMap = {};
+        allPicks.forEach(pick => {
+          const game = allGames.find(g => g.game_id === pick.game_id);
+          const winner_team = game?.winner_team ?? null;
+          if (!winner_team) return;
+
+          if (!grandTotalsMap[pick.user_id]) grandTotalsMap[pick.user_id] = 0;
+          if (pick.picked_team === winner_team) grandTotalsMap[pick.user_id] += 1;
+        });
+
         setGrandTotals(grandTotalsMap);
       } catch (err) {
         console.error("Error fetching leaderboard:", err);

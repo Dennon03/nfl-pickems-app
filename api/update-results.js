@@ -7,9 +7,27 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY
 );
 
-// Example: list of winning teams
-const winningTeams = ['Las Vegas Raiders', 'Tampa Bay Buccaneers', 'Jacksonville Jaguars', 'Washington Commanders', 'Arizona Cardinals', 'Pittsburgh Steelers', 'Denver Broncos', 'Green Bay Packers', 'San Francisco 49ers','Indianapolis Colts','Minnesota Vikings','Los Angeles Rams','Buffalo Bills', 'Cincinnati Bengals', 'Philadelphia Eagles', 'Los Angeles Chargers']; // <-- put your winners here
-const week = 1; // Set the week you want to update
+// Week 2 winners
+const winningTeams = [
+  'Green Bay Packers',
+  'Baltimore Ravens',
+  'Cincinnati Bengals',
+  'Dallas Cowboys',
+  'Detroit Lions',
+  'New England Patriots',
+  'San Francisco 49ers',
+  'Buffalo Bills',
+  'Seattle Seahawks',
+  'Los Angeles Rams',
+  'Arizona Cardinals',
+  'Indianapolis Colts',
+  'Philadelphia Eagles',
+  'Atlanta Falcons',
+  'Tampa Bay Buccaneers',
+  'Los Angeles Chargers'
+];
+
+const week = 2; // Updating week 2 picks
 
 async function updateUserPicks() {
   try {
