@@ -5,11 +5,10 @@ import { supabase } from "../supabaseClient";
 export default function LeaderboardPage() {
   const [week, setWeek] = useState(null);
   const [leaderboard, setLeaderboard] = useState([]);
-  const [grandTotals, setGrandTotals] = useState({});
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  // ✅ Fetch the latest completed week
+  // Fetch the latest completed week
   useEffect(() => {
     const fetchLatestCompletedWeek = async () => {
       try {
@@ -25,7 +24,6 @@ export default function LeaderboardPage() {
           return;
         }
 
-        // Pick the latest week that has completed games
         setWeek(completedGames[0].week);
       } catch (err) {
         console.error("Error fetching latest completed week:", err);
@@ -43,7 +41,7 @@ export default function LeaderboardPage() {
     const fetchLeaderboard = async () => {
       setLoading(true);
       try {
-        // 1️⃣ Fetch picks for the current week
+        // Fetch picks for the current week
         const { data: picksData, error: picksError } = await supabase
           .from("user_picks")
           .select("user_id, picked_team, week, users!inner(username), game_id")
@@ -58,7 +56,7 @@ export default function LeaderboardPage() {
 
         const gameIds = picksData.map(p => p.game_id).filter(Boolean);
 
-        // 2️⃣ Fetch game results for current week
+        // Fetch game results for current week
         const { data: gamesData, error: gamesError } = await supabase
           .from("game_results")
           .select("game_id, winner_team")
@@ -66,14 +64,11 @@ export default function LeaderboardPage() {
 
         if (gamesError) throw gamesError;
 
-        // 3️⃣ Completed games
-        const completedGameIds = gamesData
-          .filter(g => g.winner_team !== null)
-          .map(g => g.game_id);
-
+        // Completed games
+        const completedGameIds = gamesData.filter(g => g.winner_team !== null).map(g => g.game_id);
         const completedPicks = picksData.filter(p => completedGameIds.includes(p.game_id));
 
-        // 4️⃣ Build leaderboard stats for this week
+        // Build leaderboard stats for this week
         const userStats = {};
         completedPicks.forEach(pick => {
           const userId = pick.user_id;
@@ -90,34 +85,6 @@ export default function LeaderboardPage() {
         });
 
         setLeaderboard(Object.values(userStats).sort((a, b) => b.correctCount - a.correctCount));
-
-        // 5️⃣ Fetch ALL picks to build grand totals
-        const { data: allPicks, error: allPicksError } = await supabase
-          .from("user_picks")
-          .select("user_id, picked_team, game_id");
-
-        if (allPicksError) throw allPicksError;
-
-        const allGameIds = allPicks.map(p => p.game_id).filter(Boolean);
-
-        const { data: allGames, error: allGamesError } = await supabase
-          .from("game_results")
-          .select("game_id, winner_team")
-          .in("game_id", allGameIds);
-
-        if (allGamesError) throw allGamesError;
-
-        const grandTotalsMap = {};
-        allPicks.forEach(pick => {
-          const game = allGames.find(g => g.game_id === pick.game_id);
-          const winner_team = game?.winner_team ?? null;
-          if (!winner_team) return;
-
-          if (!grandTotalsMap[pick.user_id]) grandTotalsMap[pick.user_id] = 0;
-          if (pick.picked_team === winner_team) grandTotalsMap[pick.user_id] += 1;
-        });
-
-        setGrandTotals(grandTotalsMap);
       } catch (err) {
         console.error("Error fetching leaderboard:", err);
       } finally {
@@ -173,20 +140,17 @@ export default function LeaderboardPage() {
                   <th style={{ padding: "8px" }}>User</th>
                   <th style={{ padding: "8px" }}>Correct Picks</th>
                   <th style={{ padding: "8px" }}>Total Picks</th>
-                  <th style={{ padding: "8px" }}>Grand Total Correct</th>
                 </tr>
               </thead>
               <tbody>
                 {(() => {
                   let lastScore = null;
                   let lastRank = 0;
-
                   return leaderboard.map((user, index) => {
                     if (user.correctCount !== lastScore) {
                       lastRank = lastRank + 1;
                       lastScore = user.correctCount;
                     }
-                    // If user.correctCount === lastScore, lastRank stays the same
 
                     return (
                       <tr
@@ -200,7 +164,6 @@ export default function LeaderboardPage() {
                         <td style={{ padding: "8px" }}>{user.username}</td>
                         <td style={{ padding: "8px", color: "#28a745", fontWeight: 600 }}>{user.correctCount}</td>
                         <td style={{ padding: "8px" }}>{user.totalPicks}</td>
-                        <td style={{ padding: "8px", fontWeight: 600 }}>{grandTotals[user.user_id] ?? 0}</td>
                       </tr>
                     );
                   });

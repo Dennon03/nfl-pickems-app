@@ -7,28 +7,26 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY
 );
 
-// Week 2 winners
+
 const winningTeams = [
-  'Green Bay Packers',
-  'Baltimore Ravens',
-  'Cincinnati Bengals',
-  'Dallas Cowboys',
-  'Detroit Lions',
-  'New England Patriots',
-  'San Francisco 49ers',
-  'Buffalo Bills',
-  'Seattle Seahawks',
-  'Los Angeles Rams',
-  'Arizona Cardinals',
-  'Indianapolis Colts',
-  'Philadelphia Eagles',
-  'Atlanta Falcons',
-  'Tampa Bay Buccaneers',
-  'Los Angeles Chargers'
+  "Cincinnati Bengals",
+  "Los Angeles Rams",
+  "Chicago Bears",
+  "Cleveland Browns",
+  "Kansas City Chiefs",
+  "Philadelphia Eagles",
+  "Carolina Panthers",
+  "New England Patriots",
+  "Denver Broncos",
+  "Indianapolis Colts",
+  "Green Bay Packers",
+  "Dallas Cowboys",
+  "San Francisco 49ers",
+  "Detroit Lions",
+  "Seattle Seahawks"
 ];
 
-const week = 2; // Updating week 2 picks
-
+const week = 7; 
 async function updateUserPicks() {
   try {
     // Fetch all picks for this week
