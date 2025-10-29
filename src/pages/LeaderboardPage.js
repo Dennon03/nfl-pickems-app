@@ -5,6 +5,7 @@ import { supabase } from "../supabaseClient";
 export default function LeaderboardPage() {
   const [week, setWeek] = useState(null);
   const [leaderboard, setLeaderboard] = useState([]);
+  const [grandLeaderboard, setGrandLeaderboard] = useState([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
@@ -41,7 +42,6 @@ export default function LeaderboardPage() {
     const fetchLeaderboard = async () => {
       setLoading(true);
       try {
-        // Fetch picks for the current week
         const { data: picksData, error: picksError } = await supabase
           .from("user_picks")
           .select("user_id, picked_team, week, users!inner(username), game_id")
@@ -56,7 +56,6 @@ export default function LeaderboardPage() {
 
         const gameIds = picksData.map(p => p.game_id).filter(Boolean);
 
-        // Fetch game results for current week
         const { data: gamesData, error: gamesError } = await supabase
           .from("game_results")
           .select("game_id, winner_team")
@@ -64,11 +63,9 @@ export default function LeaderboardPage() {
 
         if (gamesError) throw gamesError;
 
-        // Completed games
         const completedGameIds = gamesData.filter(g => g.winner_team !== null).map(g => g.game_id);
         const completedPicks = picksData.filter(p => completedGameIds.includes(p.game_id));
 
-        // Build leaderboard stats for this week
         const userStats = {};
         completedPicks.forEach(pick => {
           const userId = pick.user_id;
@@ -95,9 +92,66 @@ export default function LeaderboardPage() {
     fetchLeaderboard();
   }, [week]);
 
+  useEffect(() => {
+    const fetchGrandLeaderboard = async () => {
+      try {
+        const { data: allPicks, error: picksError } = await supabase
+          .from("user_picks")
+          .select("user_id, picked_team, week, users!inner(username), game_id");
+
+        if (picksError) throw picksError;
+
+        if (!allPicks || allPicks.length === 0) {
+          setGrandLeaderboard([]);
+          return;
+        }
+
+        const gameIds = [...new Set(allPicks.map(p => p.game_id).filter(Boolean))];
+
+        const { data: gamesData, error: gamesError } = await supabase
+          .from("game_results")
+          .select("game_id, winner_team")
+          .in("game_id", gameIds);
+
+        if (gamesError) throw gamesError;
+
+        const completedGameIds = gamesData
+          .filter(g => g.winner_team !== null)
+          .map(g => g.game_id);
+
+        const userStats = {};
+        allPicks.forEach(pick => {
+          const userId = pick.user_id;
+          const username = pick.users?.username ?? "Unknown";
+          const game = gamesData.find(g => g.game_id === pick.game_id);
+          const winner_team = game?.winner_team ?? null;
+
+          if (!userStats[userId]) {
+            userStats[userId] = { user_id: userId, username, correctCount: 0, totalPicks: 0 };
+          }
+
+          // Count correct picks only for completed games
+          if (winner_team && pick.picked_team === winner_team) {
+            userStats[userId].correctCount += 1;
+          }
+
+          // Count all picks for grand total
+          userStats[userId].totalPicks += 1;
+        });
+
+        setGrandLeaderboard(
+          Object.values(userStats).sort((a, b) => b.correctCount - a.correctCount)
+        );
+      } catch (err) {
+        console.error("Error fetching grand leaderboard:", err);
+      }
+    };
+
+    fetchGrandLeaderboard();
+  }, []);
+
   return (
     <div style={{ maxWidth: 700, margin: "auto", padding: 20 }}>
-      {/* Back button top-left */}
       <div style={{ display: "flex", justifyContent: "flex-start", marginBottom: 20 }}>
         <button
           style={{
@@ -116,61 +170,119 @@ export default function LeaderboardPage() {
 
       {loading ? (
         <p style={{ textAlign: "center" }}>Loading leaderboard...</p>
-      ) : !week ? (
-        <p style={{ textAlign: "center" }}>No completed weeks yet.</p>
-      ) : leaderboard.length === 0 ? (
-        <p style={{ textAlign: "center" }}>No results found for Week {week}.</p>
       ) : (
         <>
-          <h1 style={{ fontSize: "1.2rem", textAlign: "center" }}>Leaderboard - Week {week}</h1>
-          <div style={{ overflowX: "auto" }}>
-            <table
-              style={{
-                width: "100%",
-                minWidth: 500,
-                borderCollapse: "collapse",
-                fontSize: "0.9rem",
-                marginTop: 20,
-                textAlign: "center",
-              }}
-            >
-              <thead>
-                <tr style={{ backgroundColor: "#f0f0f0" }}>
-                  <th style={{ padding: "8px" }}>Rank</th>
-                  <th style={{ padding: "8px" }}>User</th>
-                  <th style={{ padding: "8px" }}>Correct Picks</th>
-                  <th style={{ padding: "8px" }}>Total Picks</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(() => {
-                  let lastScore = null;
-                  let lastRank = 0;
-                  return leaderboard.map((user, index) => {
-                    if (user.correctCount !== lastScore) {
-                      lastRank = lastRank + 1;
-                      lastScore = user.correctCount;
-                    }
+          {/* Grand Total Table */}
+          {grandLeaderboard.length > 0 && (
+            <>
+              <h1 style={{ fontSize: "1.2rem", textAlign: "center" }}>Grand Total Leaderboard</h1>
+              <div style={{ overflowX: "auto", marginBottom: 40 }}>
+                <table
+                  style={{
+                    width: "100%",
+                    minWidth: 500,
+                    borderCollapse: "collapse",
+                    fontSize: "0.9rem",
+                    marginTop: 20,
+                    textAlign: "center",
+                  }}
+                >
+                  <thead>
+                    <tr style={{ backgroundColor: "#f0f0f0" }}>
+                      <th style={{ padding: "8px" }}>Rank</th>
+                      <th style={{ padding: "8px" }}>User</th>
+                      <th style={{ padding: "8px" }}>Correct Picks</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(() => {
+                      let lastScore = null;
+                      let lastRank = 0;
+                      return grandLeaderboard.map((user, index) => {
+                        if (user.correctCount !== lastScore) {
+                          lastRank = lastRank + 1;
+                          lastScore = user.correctCount;
+                        }
 
-                    return (
-                      <tr
-                        key={user.user_id}
-                        style={{
-                          borderBottom: "1px solid #ddd",
-                          backgroundColor: index % 2 === 0 ? "#fafafa" : "#fff",
-                        }}
-                      >
-                        <td style={{ padding: "8px" }}>{lastRank}</td>
-                        <td style={{ padding: "8px" }}>{user.username}</td>
-                        <td style={{ padding: "8px", color: "#28a745", fontWeight: 600 }}>{user.correctCount}</td>
-                        <td style={{ padding: "8px" }}>{user.totalPicks}</td>
-                      </tr>
-                    );
-                  });
-                })()}
-              </tbody>
-            </table>
-          </div>
+                        return (
+                          <tr
+                            key={user.user_id}
+                            style={{
+                              borderBottom: "1px solid #ddd",
+                              backgroundColor: index % 2 === 0 ? "#fafafa" : "#fff",
+                            }}
+                          >
+                            <td style={{ padding: "8px" }}>{lastRank}</td>
+                            <td style={{ padding: "8px" }}>{user.username}</td>
+                            <td style={{ padding: "8px", color: "#28a745", fontWeight: 600 }}>
+                              {user.correctCount}
+                            </td>
+                          </tr>
+                        );
+                      });
+                    })()}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+
+          {/* Weekly Table */}
+          {week && leaderboard.length > 0 && (
+            <>
+              <h1 style={{ fontSize: "1.2rem", textAlign: "center" }}>Leaderboard - Week {week}</h1>
+              <div style={{ overflowX: "auto" }}>
+                <table
+                  style={{
+                    width: "100%",
+                    minWidth: 500,
+                    borderCollapse: "collapse",
+                    fontSize: "0.9rem",
+                    marginTop: 20,
+                    textAlign: "center",
+                  }}
+                >
+                  <thead>
+                    <tr style={{ backgroundColor: "#f0f0f0" }}>
+                      <th style={{ padding: "8px" }}>Rank</th>
+                      <th style={{ padding: "8px" }}>User</th>
+                      <th style={{ padding: "8px" }}>Correct Picks</th>
+                      <th style={{ padding: "8px" }}>Total Picks</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(() => {
+                      let lastScore = null;
+                      let lastRank = 0;
+                      return leaderboard.map((user, index) => {
+                        if (user.correctCount !== lastScore) {
+                          lastRank = lastRank + 1;
+                          lastScore = user.correctCount;
+                        }
+
+                        return (
+                          <tr
+                            key={user.user_id}
+                            style={{
+                              borderBottom: "1px solid #ddd",
+                              backgroundColor: index % 2 === 0 ? "#fafafa" : "#fff",
+                            }}
+                          >
+                            <td style={{ padding: "8px" }}>{lastRank}</td>
+                            <td style={{ padding: "8px" }}>{user.username}</td>
+                            <td style={{ padding: "8px", color: "#28a745", fontWeight: 600 }}>
+                              {user.correctCount}
+                            </td>
+                            <td style={{ padding: "8px" }}>{user.totalPicks}</td>
+                          </tr>
+                        );
+                      });
+                    })()}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
         </>
       )}
     </div>

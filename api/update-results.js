@@ -9,24 +9,22 @@ const supabase = createClient(
 
 
 const winningTeams = [
-  "Cincinnati Bengals",
-  "Los Angeles Rams",
-  "Chicago Bears",
-  "Cleveland Browns",
-  "Kansas City Chiefs",
-  "Philadelphia Eagles",
-  "Carolina Panthers",
-  "New England Patriots",
-  "Denver Broncos",
-  "Indianapolis Colts",
-  "Green Bay Packers",
-  "Dallas Cowboys",
-  "San Francisco 49ers",
-  "Detroit Lions",
-  "Seattle Seahawks"
+  'Los Angeles Chargers',
+  'Miami Dolphins',
+  'New York Jets',
+  'New England Patriots',
+  'Philadelphia Eagles',
+  'Buffalo Bills',
+  'Baltimore Ravens',
+  'Houston Texans',
+  'Tampa Bay Buccaneers',
+  'Denver Broncos',
+  'Indianapolis Colts',
+  'Green Bay Packers',
+  'Kansas City Chiefs'
 ];
 
-const week = 7; 
+const week = 8; 
 async function updateUserPicks() {
   try {
     // Fetch all picks for this week
