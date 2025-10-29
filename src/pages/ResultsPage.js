@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react"; 
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../supabaseClient";
 
@@ -10,55 +10,43 @@ export default function ResultsPage({ user }) {
   useEffect(() => {
     const fetchResults = async () => {
       try {
-        // 1. Get user picks
+        if (!user?.id) return;
+
+        // 1. Get user picks for all weeks
         const { data: picksData, error: picksError } = await supabase
           .from("user_picks")
-          .select("game_id, picked_team, week")
+          .select("game_id, picked_team, is_correct, week")
           .eq("user_id", user.id);
 
         if (picksError) throw picksError;
-        if (!picksData || picksData.length === 0) {
-          setResults([]);
-          return;
-        }
 
-        // 2. Filter valid game_ids
-        const gameIds = picksData.map(p => p.game_id).filter(Boolean);
-
-        if (gameIds.length === 0) {
-          setResults([]);
-          return;
-        }
-
-        // 3. Get actual results from game_results
+        // 2. Fetch all completed games (any week with winner_team not null)
         const { data: gamesData, error: gamesError } = await supabase
           .from("game_results")
           .select(
             "game_id, game_date, home_team, away_team, home_score, away_score, winner_team, week"
           )
-          .in("game_id", gameIds);
+          .not("winner_team", "is", null); // only completed games
 
         if (gamesError) throw gamesError;
 
-        // 4. Combine picks with results (only for completed games)
-        const completedGames = gamesData.filter(g => g.winner_team !== null);
+        // 3. Map picks by normalized game_id for fast lookup
+        const picksMap = {};
+        picksData.forEach(pick => {
+          picksMap[String(pick.game_id).trim()] = pick;
+        });
 
-        const combined = picksData
-          .map(pick => {
-            const game = completedGames.find(g => g.game_id === pick.game_id);
-            if (!game) return null; // skip picks for games not completed yet
-            return {
-              ...pick,
-              home_team: game.home_team,
-              away_team: game.away_team,
-              home_score: game.home_score,
-              away_score: game.away_score,
-              winner_team: game.winner_team,
-              game_date: game.game_date,
-            };
-          })
-          .filter(Boolean); // remove null entries
+        // 4. Combine results with picks
+        const combined = gamesData.map(game => {
+          const pick = picksMap[String(game.game_id).trim()];
+          return {
+            ...game,
+            picked_team: pick ? pick.picked_team : "—",
+            is_correct: pick ? pick.is_correct : false,
+          };
+        });
 
+        // 5. Sort by week and date
         combined.sort(
           (a, b) => a.week - b.week || new Date(a.game_date || 0) - new Date(b.game_date || 0)
         );
@@ -71,11 +59,13 @@ export default function ResultsPage({ user }) {
       }
     };
 
-    if (user?.id) fetchResults();
+    fetchResults();
   }, [user]);
 
   const weeks = [...new Set(results.map(r => r.week))].sort((a, b) => b - a);
-  const grandTotalCorrect = results.filter(g => g.picked_team === g.winner_team).length;
+
+  // Grand total only counts picks the user actually made
+  const grandTotalCorrect = results.filter(r => r.is_correct).length;
 
   return (
     <div style={{ maxWidth: 900, margin: "auto", padding: 20 }}>
@@ -103,18 +93,22 @@ export default function ResultsPage({ user }) {
       ) : (
         <>
           <h2 style={{ marginBottom: 20 }}>
-            Grand Total: {grandTotalCorrect} / {results.length} correct overall!
+            Grand Total: {grandTotalCorrect} /{" "}
+            {results.filter(r => r.picked_team !== "—").length} correct overall!
           </h2>
 
           {weeks.map(week => {
             const weekResults = results.filter(r => r.week === week);
-            const correctCount = weekResults.filter(g => g.picked_team === g.winner_team).length;
+            const correctCount = weekResults.filter(g => g.is_correct).length;
+            const wrongCount = weekResults.filter(
+              g => g.picked_team !== "—" && !g.is_correct
+            ).length;
 
             return (
               <div key={week} style={{ marginBottom: 40 }}>
                 <h1>Week {week} Results</h1>
                 <h2 style={{ marginBottom: 20 }}>
-                  You got {correctCount} / {weekResults.length} correct for Week {week}!
+                  Correct: {correctCount} | Wrong: {wrongCount}
                 </h2>
 
                 <div style={{ overflowX: "auto" }}>
@@ -143,7 +137,11 @@ export default function ResultsPage({ user }) {
                           style={{
                             borderBottom: "1px solid #ddd",
                             backgroundColor:
-                              game.picked_team === game.winner_team ? "#d4edda" : "#f8d7da",
+                              game.is_correct
+                                ? "#d4edda"
+                                : game.picked_team === "—"
+                                ? "#f0f0f0"
+                                : "#f8d7da",
                           }}
                         >
                           <td style={{ padding: "8px" }}>

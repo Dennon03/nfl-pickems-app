@@ -35,7 +35,7 @@ export default function LeaderboardPage() {
     fetchLatestCompletedWeek();
   }, []);
 
-  // Fetch leaderboard for the latest completed week
+  // Weekly leaderboard
   useEffect(() => {
     if (!week) return;
 
@@ -63,15 +63,14 @@ export default function LeaderboardPage() {
 
         if (gamesError) throw gamesError;
 
-        const completedGameIds = gamesData.filter(g => g.winner_team !== null).map(g => g.game_id);
-        const completedPicks = picksData.filter(p => completedGameIds.includes(p.game_id));
-
         const userStats = {};
-        completedPicks.forEach(pick => {
+        picksData.forEach(pick => {
+          const game = gamesData.find(g => g.game_id === pick.game_id);
+          if (!game?.winner_team) return; // skip unfinished games
+
           const userId = pick.user_id;
           const username = pick.users?.username ?? "Unknown";
-          const game = gamesData.find(g => g.game_id === pick.game_id);
-          const winner_team = game?.winner_team ?? null;
+          const winner_team = game.winner_team;
 
           if (!userStats[userId]) {
             userStats[userId] = { user_id: userId, username, correctCount: 0, totalPicks: 0 };
@@ -81,7 +80,9 @@ export default function LeaderboardPage() {
           if (pick.picked_team === winner_team) userStats[userId].correctCount += 1;
         });
 
-        setLeaderboard(Object.values(userStats).sort((a, b) => b.correctCount - a.correctCount));
+        setLeaderboard(
+          Object.values(userStats).sort((a, b) => b.correctCount - a.correctCount)
+        );
       } catch (err) {
         console.error("Error fetching leaderboard:", err);
       } finally {
@@ -92,6 +93,7 @@ export default function LeaderboardPage() {
     fetchLeaderboard();
   }, [week]);
 
+  // Grand leaderboard
   useEffect(() => {
     const fetchGrandLeaderboard = async () => {
       try {
@@ -100,7 +102,6 @@ export default function LeaderboardPage() {
           .select("user_id, picked_team, week, users!inner(username), game_id");
 
         if (picksError) throw picksError;
-
         if (!allPicks || allPicks.length === 0) {
           setGrandLeaderboard([]);
           return;
@@ -115,28 +116,21 @@ export default function LeaderboardPage() {
 
         if (gamesError) throw gamesError;
 
-        const completedGameIds = gamesData
-          .filter(g => g.winner_team !== null)
-          .map(g => g.game_id);
-
         const userStats = {};
         allPicks.forEach(pick => {
+          const game = gamesData.find(g => g.game_id === pick.game_id);
+          if (!game?.winner_team) return; // skip unfinished games
+
           const userId = pick.user_id;
           const username = pick.users?.username ?? "Unknown";
-          const game = gamesData.find(g => g.game_id === pick.game_id);
-          const winner_team = game?.winner_team ?? null;
+          const winner_team = game.winner_team;
 
           if (!userStats[userId]) {
             userStats[userId] = { user_id: userId, username, correctCount: 0, totalPicks: 0 };
           }
 
-          // Count correct picks only for completed games
-          if (winner_team && pick.picked_team === winner_team) {
-            userStats[userId].correctCount += 1;
-          }
-
-          // Count all picks for grand total
           userStats[userId].totalPicks += 1;
+          if (pick.picked_team === winner_team) userStats[userId].correctCount += 1;
         });
 
         setGrandLeaderboard(
@@ -172,61 +166,6 @@ export default function LeaderboardPage() {
         <p style={{ textAlign: "center" }}>Loading leaderboard...</p>
       ) : (
         <>
-          {/* Grand Total Table */}
-          {grandLeaderboard.length > 0 && (
-            <>
-              <h1 style={{ fontSize: "1.2rem", textAlign: "center" }}>Grand Total Leaderboard</h1>
-              <div style={{ overflowX: "auto", marginBottom: 40 }}>
-                <table
-                  style={{
-                    width: "100%",
-                    minWidth: 500,
-                    borderCollapse: "collapse",
-                    fontSize: "0.9rem",
-                    marginTop: 20,
-                    textAlign: "center",
-                  }}
-                >
-                  <thead>
-                    <tr style={{ backgroundColor: "#f0f0f0" }}>
-                      <th style={{ padding: "8px" }}>Rank</th>
-                      <th style={{ padding: "8px" }}>User</th>
-                      <th style={{ padding: "8px" }}>Correct Picks</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(() => {
-                      let lastScore = null;
-                      let lastRank = 0;
-                      return grandLeaderboard.map((user, index) => {
-                        if (user.correctCount !== lastScore) {
-                          lastRank = lastRank + 1;
-                          lastScore = user.correctCount;
-                        }
-
-                        return (
-                          <tr
-                            key={user.user_id}
-                            style={{
-                              borderBottom: "1px solid #ddd",
-                              backgroundColor: index % 2 === 0 ? "#fafafa" : "#fff",
-                            }}
-                          >
-                            <td style={{ padding: "8px" }}>{lastRank}</td>
-                            <td style={{ padding: "8px" }}>{user.username}</td>
-                            <td style={{ padding: "8px", color: "#28a745", fontWeight: 600 }}>
-                              {user.correctCount}
-                            </td>
-                          </tr>
-                        );
-                      });
-                    })()}
-                  </tbody>
-                </table>
-              </div>
-            </>
-          )}
-
           {/* Weekly Table */}
           {week && leaderboard.length > 0 && (
             <>
