@@ -9,7 +9,6 @@ export default function ViewPicksPage({ user }) {
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(false);
   const [firstGameStart, setFirstGameStart] = useState(null);
-  const picksLocked = firstGameStart && new Date() >= new Date(firstGameStart);
 
   const navigate = useNavigate();
   const query = new URLSearchParams(useLocation().search);
@@ -98,6 +97,23 @@ export default function ViewPicksPage({ user }) {
       setSaving(false);
     }
   };
+
+  // ----------------------------------------------------------
+  // NEW LOCKING LOGIC — LOCK THE DAY AFTER THE FIRST GAME
+  // ----------------------------------------------------------
+  let picksLocked = false;
+  if (firstGameStart) {
+    const first = new Date(firstGameStart);
+
+    // Lock the next day at 00:00 ET (05:00 UTC)
+    const lockYear = first.getUTCFullYear();
+    const lockMonth = first.getUTCMonth();
+    const lockDay = first.getUTCDate() + 1;
+
+    const lockTime = new Date(Date.UTC(lockYear, lockMonth, lockDay, 5, 0, 0));
+    picksLocked = new Date() >= lockTime;
+  }
+  // ----------------------------------------------------------
 
   if (loading) return <p>Loading saved picks...</p>;
   if (error) return <p style={{ color: "red" }}>{error}</p>;
